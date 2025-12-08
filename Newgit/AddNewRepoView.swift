@@ -184,10 +184,18 @@ struct AddNewRepoView: View {
 
         // Prepare repo: create README if missing, init git if needed, commit
         var cmds = "cd \(shellEscape(dir))\n"
-        cmds += "git init \n"
-        cmds += "if [ ! -f README.md ]; then echo '# \(title)' > README.md; fi\n"
+        // Initialize git if needed
         cmds += "if [ ! -d .git ]; then git init; fi\n"
-        cmds += "git add . \n"
+        // Ensure git user.name/email are set locally (fall back to global if available)
+        cmds += "GNAME=$(git config user.name 2>/dev/null || true)\n"
+        cmds += "if [ -z \"$GNAME\" ]; then GNAME=$(git config --global user.name 2>/dev/null || true); fi\n"
+        cmds += "if [ -n \"$GNAME\" ]; then git config user.name \"$GNAME\"; fi\n"
+        cmds += "GEMAIL=$(git config user.email 2>/dev/null || true)\n"
+        cmds += "if [ -z \"$GEMAIL\" ]; then GEMAIL=$(git config --global user.email 2>/dev/null || true); fi\n"
+        cmds += "if [ -n \"$GEMAIL\" ]; then git config user.email \"$GEMAIL\"; fi\n"
+        // Create README if missing
+        cmds += "if [ ! -f README.md ]; then printf '# %s\n' \"\(title)\" > README.md; fi\n"
+        cmds += "git add .\n"
         cmds += "git commit -m \"Initial commit\" || true\n"
 
         let prepRes = runCommand(cmds)
@@ -197,11 +205,63 @@ struct AddNewRepoView: View {
 
         // Use gh to create the remote and push. Run inside the directory.
         let visibility = makePrivate ? "--private" : "--public"
-        // Use gh repo create with --source=. --remote=origin --push to create remote from local dir
+
+        // Ensure there's a commit and a branch name gh can detect
+        let isWorkTree = runCommand("cd \(shellEscape(dir)) && git rev-parse --is-inside-work-tree")
+        DispatchQueue.main.async { publishOutput += "git work-tree: \(isWorkTree.output.trimmingCharacters(in: .whitespacesAndNewlines)) (code \(isWorkTree.status))\n" }
+
+        var hasHead = runCommand("cd \(shellEscape(dir)) && git rev-parse --verify HEAD")
+        if hasHead.status != 0 {
+            // create an explicit commit if none exists (allow-empty if needed)
+            let commitRes = runCommand("cd \(shellEscape(dir)) && git commit --allow-empty -m \"Initial commit\"")
+            DispatchQueue.main.async { publishOutput += "Created empty commit output:\n\(commitRes.output)\n" }
+            hasHead = runCommand("cd \(shellEscape(dir)) && git rev-parse --verify HEAD")
+        }
+
+        // Ensure branch exists and is named (switch to main)
+        var branchRes = runCommand("cd \(shellEscape(dir)) && git rev-parse --abbrev-ref HEAD")
+        var branch = branchRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        if branch.isEmpty || branch == "HEAD" {
+            let setBranch = runCommand("cd \(shellEscape(dir)) && git branch -M main")
+            DispatchQueue.main.async { publishOutput += "Set branch output:\n\(setBranch.output)\n" }
+            branch = "main"
+        }
+        DispatchQueue.main.async { publishOutput += "Using branch: \(branch)\n" }
+
+        // Try gh --source flow first (requires running in the repo dir)
         let ghArgs = ["repo", "create", title, visibility, "--source", ".", "--remote", "origin", "--push"]
-        let ghRes = runGHCommand(ghArgs)
-        DispatchQueue.main.async {
-            publishOutput += "gh output:\n\(ghRes.output)\n"
+        var ghRes = runGHCommand(ghArgs, currentDirectory: dir)
+        DispatchQueue.main.async { publishOutput += "gh output:\n\(ghRes.output)\n" }
+
+        // Fallback: if gh couldn't detect the local repo, create remote then add remote + push manually
+        if ghRes.status != 0 {
+            DispatchQueue.main.async { publishOutput += "gh --source flow failed, attempting fallback...\n" }
+            let ghCreateArgs = ["repo", "create", title, visibility, "--confirm"]
+            let ghCreateRes = runGHCommand(ghCreateArgs, currentDirectory: nil)
+            DispatchQueue.main.async { publishOutput += "gh create (no source) output:\n\(ghCreateRes.output)\n" }
+
+            if ghCreateRes.status == 0 {
+                // Resolve remote URL (prefer https)
+                let viewRes = runGHCommand(["repo", "view", title, "--json", "url,sshUrl", "--jq", ".url"], currentDirectory: nil)
+                var remoteURL = viewRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if remoteURL.isEmpty {
+                    let viewSsh = runGHCommand(["repo", "view", title, "--json", "sshUrl", "--jq", ".sshUrl"], currentDirectory: nil)
+                    remoteURL = viewSsh.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                DispatchQueue.main.async { publishOutput += "Resolved remote URL: \(remoteURL)\n" }
+
+                if !remoteURL.isEmpty {
+                    let addRemote = runCommand("cd \(shellEscape(dir)) && git remote add origin \(shellEscape(remoteURL)) || git remote set-url origin \(shellEscape(remoteURL))")
+                    DispatchQueue.main.async { publishOutput += "git remote add/set output:\n\(addRemote.output)\n" }
+                    let pushRes = runCommand("cd \(shellEscape(dir)) && git push -u origin \(shellEscape(branch))")
+                    DispatchQueue.main.async { publishOutput += "git push output:\n\(pushRes.output)\n" }
+                    ghRes = (pushRes.output, pushRes.status)
+                } else {
+                    DispatchQueue.main.async { publishOutput += "Failed to resolve remote URL from gh.\n" }
+                }
+            } else {
+                DispatchQueue.main.async { publishOutput += "gh repo create fallback failed.\n" }
+            }
         }
 
         // If gh succeeded (status 0) save the repo entry
