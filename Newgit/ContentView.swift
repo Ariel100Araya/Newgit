@@ -26,6 +26,15 @@ struct ContentView: View {
         // Build the split view into a local variable to reduce expression complexity for the compiler
         let nav = NavigationSplitView {
             sidebar
+                .toolbar {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Menu {
+                            Button("Clone Repository") { showCloneRepo = true }
+                            Button("Add New Repository") { showAddNewRepo = true }
+                            Button("Add Existing Repository") { showAddRepo = true }
+                        } label: { Image(systemName: "plus").padding(.trailing) }
+                    }
+                }
         } detail: {
             detailView
         }
@@ -103,19 +112,16 @@ struct ContentView: View {
         VStack(spacing: 0) {
             HStack {
                 Text("Repositories")
-                    .font(.headline)
-                    .padding(.leading)
+                    .font(.largeTitle)
+                    .padding([.leading,.bottom, .trailing])
+                    .bold()
                 Spacer()
-                Menu {
-                    Button("Clone Repository") { showCloneRepo = true }
-                    Button("Add New Repository") { showAddNewRepo = true }
-                    Button("Add Existing Repository") { showAddRepo = true }
-                } label: { Image(systemName: "plus").padding(.trailing) }
             }
             List(selection: $selectionID) {
                 ForEach(savedRepos, id: \.id) { repo in
                     Text(repo.name)
                         .tag(repo.id)
+                        .font(.title2)
                         .contextMenu { Button("Delete Repository") { repoToDelete = repo; showDeleteDialog = true } }
                 }
             }
