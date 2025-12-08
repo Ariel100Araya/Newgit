@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct NewgitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .modelContainer(for: [SavedRepo.self])
         }
     }
 }
