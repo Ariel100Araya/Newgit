@@ -280,6 +280,7 @@ struct AddNewRepoView: View {
                 publishMessage = "Failed to publish: see output"
             }
             showPublishAlert = true
+            dismiss()
         }
     }
 }

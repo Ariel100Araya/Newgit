@@ -1,0 +1,96 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "extended-srgb:0.38039,0.33333,0.96078,1.00000",
+      "display-p3:0.47448,0.53113,0.92432,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.7
+      }
+    }
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "image-name" : "folder.fill.png",
+          "name" : "folder.fill",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              62.2578125,
+              -100.48828125
+            ]
+          }
+        },
+        {
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "image-name" : "folder.fill.png",
+          "name" : "folder.fill",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              10.2109375,
+              -8.72265625
+            ]
+          }
+        },
+        {
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "image-name" : "folder.fill.png",
+          "name" : "folder.fill",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -43.046875,
+              70.5625
+            ]
+          }
+        },
+        {
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "hidden" : true,
+          "image-name" : "progress.indicator.png",
+          "name" : "progress.indicator",
+          "opacity" : 1,
+          "position" : {
+            "scale" : 2,
+            "translation-in-points" : [
+              -154,
+              -152.4375
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

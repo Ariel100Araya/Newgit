@@ -8,8 +8,9 @@
 import SwiftUI
 
 struct RepoView: View {
-    @State var repoTitle: String
-    @State var projectDirectory: String
+    // Make these immutable inputs instead of @State so they update predictably when parent passes new values
+    let repoTitle: String
+    let projectDirectory: String
     @State private var pushTitle: String = ""
     @State private var showCommandOutput: Bool = false
     @State private var gitPush: Bool =  false
@@ -19,102 +20,106 @@ struct RepoView: View {
     @State private var changedFiles: [String] = []
     @State private var selectedFile: String? = nil
     @State private var selectedFileDiff: String = ""
+    // Cache raw command output for the fallback UI to avoid running commands while building the view
+    @State private var changedFilesFallbackOutput: String = ""
 
     // Branch state
     @State private var branches: [String] = []
     @State private var currentBranch: String = ""
 
     var body: some View {
-            VStack(alignment: .leading) {
-                HStack {
-                    // Left pane: selectable list of changed files
+        VStack(alignment: .leading) {
+            HStack {
+                // Left pane: selectable list of changed files
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        Text("Changed Files:")
+                            .padding()
+                            .font(.title)
+                            .bold()
+                        
+                        if changedFiles.isEmpty {
+                            HStack {
+                                VStack {
+                                    // Show raw output as fallback while loading or if none
+                                    Text(changedFilesFallbackOutput)
+                                        .font(.body)
+                                        .multilineTextAlignment(.leading)
+                                        .lineLimit(nil)
+                                    Text("It seems like there isn't any changed files. Time to get to work!")
+                                        .font(.title3)
+                                        .padding()
+                                }
+                                Spacer()
+                            }
+                        } else {
+                            List(changedFiles, id: \.self) { file in
+                                Button(action: {
+                                    selectFile(file)
+                                }) {
+                                    HStack {
+                                        Text(file)
+                                            .font(.title3)
+                                            .foregroundColor(.primary)
+                                            .padding(.horizontal)
+                                        Spacer()
+                                        if selectedFile == file {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .listStyle(.plain)
+                            .frame(minWidth: 240)
+                        }
+                    }
+                }
+                // Right pane: show the diff for the selected file
+                if !changedFiles.isEmpty {
                     ScrollView {
                         VStack(alignment: .leading) {
-                            Text("Changed Files:")
+                            Text("Selected File:")
                                 .padding()
                                 .font(.title)
                                 .bold()
                             
-                            if changedFiles.isEmpty {
-                                HStack {
-                                    VStack {
-                                        // Show raw output as fallback while loading or if none
-                                        Text(runCommand("cd \(shellEscape(projectDirectory)) && git diff --name-only").output)
-                                            .font(.title3)
-                                        Text("It seems like there isn't any changed files. Time to get to work!")
-                                            .font(.title3)
-                                            .padding()
-                                    }
-                                    Spacer()
-                                }
-                            } else {
-                                List(changedFiles, id: \.self) { file in
-                                    Button(action: {
-                                        selectFile(file)
-                                    }) {
-                                        HStack {
-                                            Text(file)
-                                                .font(.title3)
-                                                .foregroundColor(.primary)
-                                                .padding(.horizontal)
-                                            Spacer()
-                                            if selectedFile == file {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .listStyle(.plain)
-                                .frame(minWidth: 240)
-                            }
-                        }
-                    }
-                    // Right pane: show the diff for the selected file
-                    if !changedFiles.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading) {
-                                Text("Selected File:")
-                                    .padding()
-                                    .font(.title)
+                            if let selected = selectedFile {
+                                Text(selected)
+                                    .padding(.horizontal)
+                                    .font(.title3)
                                     .bold()
                                 
-                                if let selected = selectedFile {
-                                    Text(selected)
+                                ScrollView {
+                                    // Use monospaced font so diffs look readable
+                                    Text(selectedFileDiff)
                                         .padding(.horizontal)
-                                        .font(.title3)
-                                        .bold()
-                                    
-                                    ScrollView {
-                                        // Use monospaced font so diffs look readable
-                                        Text(selectedFileDiff)
-                                            .padding(.horizontal)
-                                            .font(.system(.body, design: .monospaced))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                } else {
-                                    Text("Click on a file to select it and see its changes")
-                                        .padding(.horizontal)
-                                        .font(.title3)
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
+                            } else {
+                                Text("Click on a file to select it and see its changes")
+                                    .padding(.horizontal)
+                                    .font(.title3)
                             }
                         }
-                        Spacer()
                     }
+                    Spacer()
                 }
-                /*
-                VStack (alignment: .leading) {
-                    Text("Enter a push title")
-                        .padding()
-                    TextField("Enter a push title", text: $pushTitle)
-                        .padding()
-                    if showCommandOutput {
-                        let changeDirCommand = "cd \(projectDirectory) && git add . && git commit -m \"\(pushTitle)\" && git push"
-                        Text(runCommand(changeDirCommand).output)
-                    }
-                }
-                 */
             }
+            /*
+            VStack (alignment: .leading) {
+                Text("Enter a push title")
+                    .padding()
+                TextField("Enter a push title", text: $pushTitle)
+                    .padding()
+                if showCommandOutput {
+                    let changeDirCommand = "cd \(projectDirectory) && git add . && git commit -m \"\(pushTitle)\" && git push"
+                    Text(runCommand(changeDirCommand).output)
+                }
+            }
+             */
+        }
         .navigationTitle(repoTitle)
         .toolbar {
             ToolbarItemGroup(placement: .secondaryAction) {
@@ -189,9 +194,11 @@ struct RepoView: View {
 
      private func loadChangedFiles() {
          let cmd = "cd \(shellEscape(projectDirectory)) && git diff --name-only"
-         let out = runCommand(cmd).output
-         let lines = out.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
-         changedFiles = lines.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let out = runCommand(cmd).output
+        // Cache raw output to avoid calling runCommand directly from the view body
+        changedFilesFallbackOutput = out
+        let lines = out.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
+        changedFiles = lines.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
          // reset selection if current selection is no longer present
          if let sel = selectedFile, !changedFiles.contains(sel) {
