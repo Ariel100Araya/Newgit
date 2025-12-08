@@ -9,19 +9,52 @@ import Foundation
 @discardableResult
 func runCommand(_ command: String) -> (output: String, status: Int32) {
     let task = Process()
-    task.launchPath = "/bin/bash"
+    // Use modern APIs and executableURL so errors can be surfaced with try
+    task.executableURL = URL(fileURLWithPath: "/bin/bash")
     task.arguments = ["-c", command]
 
-    let pipe = Pipe()
-    task.standardOutput = pipe
-    task.standardError = pipe
+    // Ensure PATH includes common locations so git and other tools are found when invoked from the app
+    var env = ProcessInfo.processInfo.environment
+    let defaultPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+    let existingPATH = env["PATH"] ?? ""
+    var paths = defaultPaths + existingPATH.split(separator: ":").map { String($0) }
+    var seen = Set<String>()
+    paths = paths.filter { p in
+        if seen.contains(p) { return false }
+        seen.insert(p)
+        return true
+    }
+    env["PATH"] = paths.joined(separator: ":")
+    task.environment = env
 
-    task.launch()
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    let outPipe = Pipe()
+    let errPipe = Pipe()
+    task.standardOutput = outPipe
+    task.standardError = errPipe
+
+    do {
+        try task.run()
+    } catch {
+        let msg = "Failed to launch bash: \(error.localizedDescription)"
+        print("runCommand ERROR: \(msg) -- cmd=\(command)")
+        return (msg, -1)
+    }
+
+    // Wait for the process to exit before reading data to avoid partial reads
     task.waitUntilExit()
 
-    let output = String(data: data, encoding: .utf8) ?? ""
-    return (output, task.terminationStatus)
+    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+
+    let stdout = String(data: outData, encoding: .utf8) ?? ""
+    let stderr = String(data: errData, encoding: .utf8) ?? ""
+
+    // Combine stdout and stderr for backward compatibility but keep them separate in logs
+    let combined = stdout + (stderr.isEmpty ? "" : "\n[stderr]\n" + stderr)
+
+    print("runCommand: cmd=\(command)\nexit=\(task.terminationStatus)\nstdout=\(stdout)\nstderr=\(stderr)")
+
+    return (combined, task.terminationStatus)
 }
 
 @discardableResult

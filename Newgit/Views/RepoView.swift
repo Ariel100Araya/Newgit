@@ -193,38 +193,81 @@ struct RepoView: View {
      }
 
      private func loadChangedFiles() {
-         let cmd = "cd \(shellEscape(projectDirectory)) && git diff --name-only"
-        let out = runCommand(cmd).output
-        // Cache raw output to avoid calling runCommand directly from the view body
-        changedFilesFallbackOutput = out
-        let lines = out.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
-        changedFiles = lines.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+         // Use `git status --porcelain` to capture staged, unstaged and untracked files.
+         let cmd = "cd \(shellEscape(projectDirectory)) && git status --porcelain"
+         print("RepoView.loadChangedFiles: running: \(cmd)")
+         let res = runCommand(cmd)
+         let out = res.output
+         print("RepoView.loadChangedFiles: exit=\(res.status) output=\(out)")
 
-         // reset selection if current selection is no longer present
-         if let sel = selectedFile, !changedFiles.contains(sel) {
-             selectedFile = nil
-             selectedFileDiff = ""
+         // Parse porcelain output lines like: "XY <path>". For renames the format can contain "->".
+         var parsedFiles: [String] = []
+         let lines = out.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
+         for line in lines {
+             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+             if trimmed.isEmpty { continue }
+             // porcelain: first two chars are status, then a space, then path (or old -> new for renames)
+             let startIndex = trimmed.index(trimmed.startIndex, offsetBy: min(3, trimmed.count))
+             var pathPortion = String(trimmed[startIndex...]).trimmingCharacters(in: .whitespaces)
+             if pathPortion.contains(" -> ") {
+                 // For renames, take the destination path (after ->)
+                 if let arrowRange = pathPortion.range(of: " -> ") {
+                     pathPortion = String(pathPortion[arrowRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                 }
+             }
+             if !pathPortion.isEmpty {
+                 parsedFiles.append(pathPortion)
+             }
+         }
+
+         // Cache raw output and update state on main thread
+         DispatchQueue.main.async {
+             self.changedFilesFallbackOutput = out
+             // Deduplicate while preserving order
+             var seen = Set<String>()
+             self.changedFiles = parsedFiles.filter { f in
+                 if seen.contains(f) { return false }
+                 seen.insert(f)
+                 return true
+             }
+
+             // reset selection if current selection is no longer present
+             if let sel = self.selectedFile, !self.changedFiles.contains(sel) {
+                 self.selectedFile = nil
+                 self.selectedFileDiff = ""
+             }
          }
      }
 
     private func loadBranches() {
         // Load local branches and current branch
         let listCmd = "cd \(shellEscape(projectDirectory)) && git branch --format=\"%(refname:short)\""
-        let listOut = runCommand(listCmd).output
+        print("RepoView.loadBranches: running: \(listCmd)")
+        let listRes = runCommand(listCmd)
+        let listOut = listRes.output
+        print("RepoView.loadBranches: exit=\(listRes.status) output=\(listOut)")
         let listLines = listOut.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
-        branches = listLines.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        DispatchQueue.main.async {
+            self.branches = listLines.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        }
         let currentCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref HEAD"
-        let currentOut = runCommand(currentCmd).output.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !currentOut.isEmpty {
-            currentBranch = currentOut
-        } else if branches.count > 0 {
-            currentBranch = branches[0]
+        let currentRes = runCommand(currentCmd)
+        let currentOut = currentRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("RepoView.loadBranches: current exit=\(currentRes.status) output=\(currentOut)")
+        DispatchQueue.main.async {
+            if !currentOut.isEmpty {
+                self.currentBranch = currentOut
+            } else if self.branches.count > 0 {
+                self.currentBranch = self.branches[0]
+            }
         }
     }
 
     private func checkoutBranch(_ branch: String) {
         let cmd = "cd \(shellEscape(projectDirectory)) && git checkout \(shellEscape(branch))"
-        _ = runCommand(cmd).output
+        print("RepoView.checkoutBranch: running: \(cmd)")
+        let res = runCommand(cmd)
+        print("RepoView.checkoutBranch: exit=\(res.status) output=\(res.output)")
         // Refresh branch list and changed files after checkout
         loadBranches()
         loadChangedFiles()
@@ -237,6 +280,11 @@ struct RepoView: View {
 
      private func loadDiff(for file: String) {
          let cmd = "cd \(shellEscape(projectDirectory)) && git --no-pager diff -- \(shellEscape(file))"
-         selectedFileDiff = runCommand(cmd).output
+         print("RepoView.loadDiff: running: \(cmd)")
+         let res = runCommand(cmd)
+         print("RepoView.loadDiff: exit=\(res.status) outputLength=\(res.output.count)")
+         DispatchQueue.main.async {
+             self.selectedFileDiff = res.output
+         }
      }
  }
