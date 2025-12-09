@@ -53,16 +53,8 @@ struct PushView: View {
                     }
                     .disabled(isProcessing)
                     .padding()
-                    .glassEffect()
                 }
                 .padding([.leading, .bottom, .trailing])
-            }
-            if showCommandOutput {
-                ScrollView {
-                    Text(commandOutput)
-                        .font(.system(.body, design: .monospaced))
-                        .padding()
-                }
             }
         }
     }
