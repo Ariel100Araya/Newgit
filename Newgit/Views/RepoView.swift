@@ -212,11 +212,33 @@ struct RepoView: View {
          var parsedFiles: [String] = []
          let lines = out.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
          for line in lines {
-             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-             if trimmed.isEmpty { continue }
+             // Don't trim leading whitespace here: git porcelain uses fixed columns for status
+             // Keep leading spaces so we can drop the exact first 3 chars (two status cols + space)
+             let raw = line.trimmingCharacters(in: .newlines)
+             if raw.isEmpty { continue }
              // porcelain: first two chars are status, then a space, then path (or old -> new for renames)
-             let startIndex = trimmed.index(trimmed.startIndex, offsetBy: min(3, trimmed.count))
-             var pathPortion = String(trimmed[startIndex...]).trimmingCharacters(in: .whitespaces)
+             var pathPortion: String
+             if raw.count >= 3 {
+                 let idx2 = raw.index(raw.startIndex, offsetBy: 2)
+                 if raw[idx2] == " " {
+                     // Expected format: two status chars + space
+                     pathPortion = String(raw[raw.index(idx2, offsetBy: 1)...]).trimmingCharacters(in: .whitespaces)
+                 } else {
+                     // Fallback for odd lines: preserve filename by starting at first non-space char
+                     if let firstNonSpace = raw.firstIndex(where: { $0 != " " && $0 != "\t" }) {
+                         pathPortion = String(raw[firstNonSpace...]).trimmingCharacters(in: .whitespaces)
+                     } else {
+                         continue
+                     }
+                 }
+             } else {
+                 // Very short lines: fallback to first non-space
+                 if let firstNonSpace = raw.firstIndex(where: { $0 != " " && $0 != "\t" }) {
+                     pathPortion = String(raw[firstNonSpace...]).trimmingCharacters(in: .whitespaces)
+                 } else {
+                     continue
+                 }
+             }
              if pathPortion.contains(" -> ") {
                  // For renames, take the destination path (after ->)
                  if let arrowRange = pathPortion.range(of: " -> ") {
