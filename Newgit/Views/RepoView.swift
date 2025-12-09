@@ -276,6 +276,7 @@ struct RepoView: View {
                      }
                      .padding(.horizontal)
                      .buttonStyle(.borderless)
+                     .tint(.purple)
                  }
                  Button("Push") {
                          showPush = true
