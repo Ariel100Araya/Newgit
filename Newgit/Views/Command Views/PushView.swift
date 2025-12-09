@@ -13,6 +13,8 @@ struct PushView: View {
     @State private var changeDirCommand: String = ""
     @State private var pushTitle: String = ""
     @State var projectDirectory: String
+    // Callback invoked on successful push so parent can refresh repository state
+    var onSuccess: (() -> Void)? = nil
     @State private var showCommandOutput: Bool = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -95,14 +97,22 @@ struct PushView: View {
             let commitRes = runCommand(commitCmd)
             combined += "$ \(commitCmd)\n" + commitRes.output + "\nexit=\(commitRes.status)\n\n"
 
-            // If commit failed (non-zero), show output and do not show success view
+            // If commit failed (non-zero) we may still want to push —
+            // common case: "nothing to commit" means there were no new local changes but there may be local commits that need pushing.
+            var shouldAttemptPushDespiteCommitFailure = false
             if commitRes.status != 0 {
-                DispatchQueue.main.async {
-                    self.commandOutput = combined
-                    self.isProcessing = false
-                    self.showSuccessView = false
+                let lower = commitRes.output.lowercased()
+                if lower.contains("nothing to commit") || lower.contains("no changes added to commit") || lower.contains("nothing added to commit") || lower.contains("nothing to commit, working tree clean") {
+                    shouldAttemptPushDespiteCommitFailure = true
                 }
-                return
+                if !shouldAttemptPushDespiteCommitFailure {
+                    DispatchQueue.main.async {
+                        self.commandOutput = combined
+                        self.isProcessing = false
+                        self.showSuccessView = false
+                    }
+                    return
+                }
             }
 
             // git push
@@ -110,13 +120,17 @@ struct PushView: View {
             let pushRes = runCommand(pushCmd)
             combined += "$ \(pushCmd)\n" + pushRes.output + "\nexit=\(pushRes.status)\n\n"
 
-            let success = (commitRes.status == 0 && pushRes.status == 0)
+            // Consider success if push succeeded. If commit succeeded and push succeeded -> success.
+            // If commit failed with 'nothing to commit' but push succeeded, it's still a success.
+            let success = (pushRes.status == 0)
 
             DispatchQueue.main.async {
                 self.commandOutput = combined
                 self.isProcessing = false
                 if success {
                     self.showSuccessView = true
+                    // Notify parent to refresh repository state
+                    self.onSuccess?()
                     // show for 5 seconds then dismiss
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         self.showSuccessView = false

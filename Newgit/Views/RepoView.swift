@@ -249,13 +249,29 @@ struct RepoView: View {
              }
          }
         .sheet(isPresented: $showPush) {
-            PushView(projectDirectory: projectDirectory)
-        }
+            PushView(projectDirectory: projectDirectory, onSuccess: {
+                // Optimistically clear the local changed-files UI so the user sees updated state immediately.
+                DispatchQueue.main.async {
+                    self.changedFiles = []
+                    self.selectedFile = nil
+                    self.selectedFileDiff = ""
+                    self.changedFilesFallbackOutput = ""
+                }
+                // Also kick off a more robust refresh sequence to reconcile with git on disk.
+                refreshRepositoryState()
+             })
+         }
          // Load the changed files when the view appears
          .onAppear {
             loadChangedFiles()
             loadBranches()
          }
+        // When the push sheet is dismissed, refresh changed files & branches.
+        .onChange(of: showPush) { oldValue, newValue in
+            if newValue == false {
+                refreshRepositoryState()
+            }
+        }
      }
 
      // MARK: - Helpers
@@ -534,4 +550,25 @@ struct RepoView: View {
              self.selectedFileDiff = finalOutput
          }
      }
+
+    // Run an immediate refresh in the background and schedule follow-up refreshes
+    // to handle any timing races with git or other processes.
+    private func refreshRepositoryState() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            loadChangedFiles()
+            loadBranches()
+        }
+
+        // Retry after a short delay to handle async state changes on disk or background hooks
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.0) {
+            loadChangedFiles()
+            loadBranches()
+        }
+
+        // One more retry slightly later
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3.0) {
+            loadChangedFiles()
+            loadBranches()
+        }
+    }
  }
