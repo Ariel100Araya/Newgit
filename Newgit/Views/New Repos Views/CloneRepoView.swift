@@ -49,11 +49,6 @@ struct CloneRepoView: View {
                     loadGHRepos()
                 }
                 .padding(.trailing, 4)
-
-                Button("Sign in with GitHub") {
-                    Task { await runGHLogin() }
-                }
-                .padding(.trailing, 4)
             }
 
             // GH repo list: selectable buttons
@@ -70,9 +65,9 @@ struct CloneRepoView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(repo.name)
-                                Text(repo.sshUrl)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                //Text(repo.sshUrl)
+                                    //.font(.caption)
+                                    //.foregroundColor(.secondary)
                                 Text(repo.url)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
@@ -88,10 +83,12 @@ struct CloneRepoView: View {
                 }
                 .frame(minHeight: 120, idealHeight: 200)
             }
-
+            
+            // Part of the SSH idea, kinda a bummer that it didn't work...
+            /*
             Toggle("Use HTTPS for clone", isOn: $useHTTPS)
                 .padding(.vertical, 6)
-
+             */
             Text("Enter a project directory")
             HStack {
                 TextField("Project Directory", text: $projectDirectory)
@@ -107,14 +104,18 @@ struct CloneRepoView: View {
                 .padding(.leading, 6)
             }
             Text("Enter a title")
-            TextField("Enter a title", text: $projectTitle)
-                .padding(.bottom)
+            TextField("Enter a title", text: Binding(get: { projectTitle }, set: { new in
+                // Typing sanitizer: convert whitespace to hyphens immediately so pressing Space inserts '-'
+                projectTitle = sanitizeProjectNameForTyping(new)
+            }))
+            .padding(.bottom)
 
-            // Allow user to edit the clone link (populated from selection)
+            // From the SSH flag! Allow user to edit the clone link (populated from selection)
+            /*
             Text("Repo link (SSH)")
             TextField(useHTTPS ? "https://github.com/owner/repo.git" : "git@github.com:owner/repo.git", text: $projectLink)
                 .padding(.bottom)
-
+            */
             // Clone controls
             HStack {
                 Button("Clone") {
@@ -128,70 +129,6 @@ struct CloneRepoView: View {
                     ProgressView().scaleEffect(0.9)
                 }
             }
-
-            if !cloningOutput.isEmpty {
-                Text("Clone output:")
-                    .font(.caption)
-                    .padding(.top, 6)
-                ScrollView {
-                    Text(cloningOutput)
-                        .font(.system(.footnote, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(4)
-                }
-                .frame(maxHeight: 180)
-                .border(Color.secondary.opacity(0.2))
-            }
-
-            Button("Add Repository") {
-                // Validate inputs
-                let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedTitle.isEmpty, !trimmedPath.isEmpty else {
-                    saveMessage = "Please enter both a project title and directory."
-                    showSaveAlert = true
-                    return
-                }
-
-                let repo = SavedRepo(name: trimmedTitle, path: trimmedPath)
-                modelContext.insert(repo)
-                do {
-                    try modelContext.save()
-                    saveMessage = "Saved \(trimmedTitle)"
-                } catch {
-                    saveMessage = "Save failed: \(error.localizedDescription)"
-                    print("ModelContext save error: \(error)")
-                }
-                showSaveAlert = true
-                // Clear inputs after adding
-                projectTitle = ""
-                projectDirectory = ""
-                projectLink = ""
-                dismiss()
-             }
-             .buttonStyle(.borderedProminent)
-             .glassEffect()
-             .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-         
-            // Show the saved repos and allow deleting
-            List {
-                ForEach(savedRepos, id: \.id) { repo in
-                    VStack(alignment: .leading) {
-                        Text(repo.name)
-                        Text(repo.path)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-                .onDelete { indices in
-                    for index in indices {
-                        let repo = savedRepos[index]
-                        modelContext.delete(repo)
-                    }
-                }
-            }
         }
         .padding()
         .navigationTitle("Add Repository")
@@ -200,18 +137,20 @@ struct CloneRepoView: View {
                 Button("Add Repository") {
                     // Validate inputs
                     let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Save-time sanitizer: trim leading/trailing hyphens
+                    let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
                     let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmedTitle.isEmpty, !trimmedPath.isEmpty else {
+                    guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
                         saveMessage = "Please enter both a project title and directory."
                         showSaveAlert = true
                         return
                     }
 
-                    let repo = SavedRepo(name: trimmedTitle, path: trimmedPath)
+                    let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
                     modelContext.insert(repo)
                     do {
                         try modelContext.save()
-                        saveMessage = "Saved \(trimmedTitle)"
+                        saveMessage = "Saved \(sanitizedTitle)"
                     } catch {
                         saveMessage = "Save failed: \(error.localizedDescription)"
                         print("ModelContext save error: \(error)")
@@ -224,11 +163,11 @@ struct CloneRepoView: View {
                  .padding(.horizontal)
                  .buttonStyle(.borderedProminent)
                  .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-             }
-         }
-        .alert(saveMessage, isPresented: $showSaveAlert) {
-            Button("OK", role: .cancel) {}
-         }
+              }
+          }
+         .alert(saveMessage, isPresented: $showSaveAlert) {
+             Button("OK", role: .cancel) {}
+          }
         .alert(cloneMessage, isPresented: $showCloneAlert) {
             Button("OK", role: .cancel) {}
          }
@@ -272,7 +211,9 @@ struct CloneRepoView: View {
     private func performCloneAndAdd() async {
         let link = projectLink.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Use save-time sanitizer for derived paths/names
+        let title = sanitizeProjectNameForSave(rawTitle)
         guard !link.isEmpty, !base.isEmpty else {
             cloneMessage = "Please provide both repo link and target directory"
             showCloneAlert = true
@@ -321,6 +262,7 @@ struct CloneRepoView: View {
                 do {
                     try modelContext.save()
                     cloneMessage = "Cloned and saved \(nameToSave)"
+                    dismiss()
                 } catch {
                     cloneMessage = "Cloned but failed to save: \(error.localizedDescription)"
                 }
@@ -357,7 +299,8 @@ struct CloneRepoView: View {
 
      private func selectGHRepo(_ repo: GHRepo) {
          selectedGHRepo = repo
-         projectTitle = repo.name
+         // When selecting from GH, show immediate-typing sanitized name (spaces -> '-')
+         projectTitle = sanitizeProjectNameForTyping(repo.name)
          if useHTTPS {
              // Use the repo.url (https) and ensure .git suffix
              var http = repo.url
@@ -441,4 +384,20 @@ struct CloneRepoView: View {
 
  #Preview {
      CloneRepoView()
+ }
+  
+ // Typing sanitizer: replace runs of whitespace with a single hyphen (keeps leading/trailing hyphens so space key yields '-')
+ private func sanitizeProjectNameForTyping(_ s: String) -> String {
+     // Replace any whitespace run with hyphen and collapse multiple hyphens
+     var out = s.replacingOccurrences(of: "\\s+", with: "-", options: .regularExpression)
+     out = out.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
+     return out
+ }
+
+// Save-time sanitizer: similar to typing sanitizer but also trims leading/trailing hyphens
+ private func sanitizeProjectNameForSave(_ s: String) -> String {
+     var out = sanitizeProjectNameForTyping(s)
+     while out.hasPrefix("-") { out.removeFirst() }
+     while out.hasSuffix("-") { out.removeLast() }
+     return out
  }

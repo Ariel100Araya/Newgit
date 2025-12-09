@@ -10,7 +10,7 @@ import SwiftData
 
 struct AddNewRepoView: View {
     @State private var projectTitle: String = ""
-    @State private var projectDirectory: String = ""
+    @State private var projectDirectory: String = "\(NSHomeDirectory())/Documents/Projects/"
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var savedRepos: [SavedRepo]
@@ -36,8 +36,11 @@ struct AddNewRepoView: View {
             }
             .padding(.bottom)
             Text("Enter a title")
-            TextField("Enter a title", text: $projectTitle)
-                .padding(.bottom)
+            TextField("Enter a title", text: Binding(get: { projectTitle }, set: { new in
+                // Convert spaces to hyphens as the user types so pressing Space inserts '-'
+                projectTitle = sanitizeProjectName(new)
+            }))
+            .padding(.bottom)
             Toggle(isOn: $makePrivate) {
                 Text("Make repository private on GitHub")
             }
@@ -54,48 +57,6 @@ struct AddNewRepoView: View {
                     ProgressView().scaleEffect(0.9)
                 }
             }
-
-            if !publishOutput.isEmpty {
-                Text("Publish output:")
-                    .font(.caption)
-                    .padding(.top, 6)
-                ScrollView {
-                    Text(publishOutput)
-                        .font(.system(.footnote, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(4)
-                }
-                .frame(maxHeight: 180)
-                .border(Color.secondary.opacity(0.2))
-            }
-            Button("Add Repository") {
-                // Validate inputs
-                let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedTitle.isEmpty, !trimmedPath.isEmpty else {
-                    saveMessage = "Please enter both a project title and directory."
-                    showSaveAlert = true
-                    return
-                }
-
-                let repo = SavedRepo(name: trimmedTitle, path: trimmedPath)
-                modelContext.insert(repo)
-                do {
-                    try modelContext.save()
-                    saveMessage = "Saved \(trimmedTitle)"
-                } catch {
-                    saveMessage = "Save failed: \(error.localizedDescription)"
-                    print("ModelContext save error: \(error)")
-                }
-                showSaveAlert = true
-                // Clear inputs after adding
-                projectTitle = ""
-                projectDirectory = ""
-                dismiss()
-             }
-             .buttonStyle(.borderedProminent)
-             .glassEffect()
-             .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding()
         .navigationTitle("Add Repository")
@@ -104,18 +65,19 @@ struct AddNewRepoView: View {
                 Button("Add Repository") {
                     // Validate inputs
                     let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let sanitizedTitle = sanitizeProjectName(trimmedTitle)
                     let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmedTitle.isEmpty, !trimmedPath.isEmpty else {
+                    guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
                         saveMessage = "Please enter both a project title and directory."
                         showSaveAlert = true
                         return
                     }
 
-                    let repo = SavedRepo(name: trimmedTitle, path: trimmedPath)
+                    let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
                     modelContext.insert(repo)
                     do {
                         try modelContext.save()
-                        saveMessage = "Saved \(trimmedTitle)"
+                        saveMessage = "Saved \(sanitizedTitle)"
                     } catch {
                         saveMessage = "Save failed: \(error.localizedDescription)"
                         print("ModelContext save error: \(error)")
@@ -163,9 +125,19 @@ struct AddNewRepoView: View {
         return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
+    // sanitize the user-provided project name into a repo-friendly form
+    private func sanitizeProjectName(_ s: String) -> String {
+        let comps = s.split{ $0.isWhitespace }
+        let joined = comps.joined(separator: "-")
+        var out = joined.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
+        while out.hasPrefix("-") { out.removeFirst() }
+        while out.hasSuffix("-") { out.removeLast() }
+        return out
+    }
+
     // Create a local git repo, initialize with README, and publish to GitHub using gh
     private func createAndPublishRepo() async {
-        let title = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = sanitizeProjectName(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines))
         let dir = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, !dir.isEmpty else {
             publishMessage = "Please enter both a title and directory"

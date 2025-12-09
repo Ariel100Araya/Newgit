@@ -12,8 +12,23 @@ import SwiftData
 struct NewgitApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .modelContainer(for: [SavedRepo.self])
+        }
+    }
+}
+
+// Small root view that inspects the saved repos and chooses the initial screen.
+private struct RootView: View {
+    @Query private var savedRepos: [SavedRepo]
+
+    var body: some View {
+        Group {
+            if savedRepos.isEmpty {
+                FirstLaunchView()
+            } else {
+                ContentView()
+            }
         }
     }
 }

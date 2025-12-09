@@ -12,7 +12,7 @@ import AppKit
 
 struct AddRepoView: View {
     @State private var projectTitle: String = ""
-    @State private var projectDirectory: String = ""
+    @State private var projectDirectory: String = "\(NSHomeDirectory())/Documents/Projects/"
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var savedRepos: [SavedRepo]
@@ -32,23 +32,28 @@ struct AddRepoView: View {
             }
             .padding(.bottom)
             Text("Enter a title")
-            TextField("Enter a title", text: $projectTitle)
-                .padding(.bottom)
+            TextField("Enter a title", text: Binding(get: { projectTitle }, set: { new in
+                // Typing sanitizer: convert whitespace runs to hyphens immediately so pressing Space inserts '-'
+                projectTitle = sanitizeProjectNameForTyping(new)
+            }))
+            .padding(.bottom)
             Button("Add Repository") {
                 // Validate inputs
                 let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                // Save-time sanitizer: trim leading/trailing hyphens
+                let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
                 let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedTitle.isEmpty, !trimmedPath.isEmpty else {
+                guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
                     saveMessage = "Please enter both a project title and directory."
                     showSaveAlert = true
                     return
                 }
 
-                let repo = SavedRepo(name: trimmedTitle, path: trimmedPath)
+                let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
                 modelContext.insert(repo)
                 do {
                     try modelContext.save()
-                    saveMessage = "Saved \(trimmedTitle)"
+                    saveMessage = "Saved \(sanitizedTitle)"
                 } catch {
                     saveMessage = "Save failed: \(error.localizedDescription)"
                     print("ModelContext save error: \(error)")
@@ -89,18 +94,20 @@ struct AddRepoView: View {
                 Button("Add Repository") {
                     // Validate inputs
                     let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Save-time sanitizer: trim leading/trailing hyphens
+                    let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
                     let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmedTitle.isEmpty, !trimmedPath.isEmpty else {
+                    guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
                         saveMessage = "Please enter both a project title and directory."
                         showSaveAlert = true
                         return
                     }
 
-                    let repo = SavedRepo(name: trimmedTitle, path: trimmedPath)
+                    let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
                     modelContext.insert(repo)
                     do {
                         try modelContext.save()
-                        saveMessage = "Saved \(trimmedTitle)"
+                        saveMessage = "Saved \(sanitizedTitle)"
                     } catch {
                         saveMessage = "Save failed: \(error.localizedDescription)"
                         print("ModelContext save error: \(error)")
@@ -116,11 +123,26 @@ struct AddRepoView: View {
              }
          }
         .alert(saveMessage, isPresented: $showSaveAlert) {
-            Button("OK", role: .cancel) {}
-         }
-     }
+             Button("OK", role: .cancel) {}
+          }
+    }
+    
+    // Typing sanitizer: replace runs of whitespace with a single hyphen (keeps leading/trailing hyphens so space key yields '-')
+    private func sanitizeProjectNameForTyping(_ s: String) -> String {
+        var out = s.replacingOccurrences(of: "\\s+", with: "-", options: .regularExpression)
+        out = out.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
+        return out
+    }
 
-    // MARK: - Helpers
+    // Save-time sanitizer: similar to typing sanitizer but also trims leading/trailing hyphens
+    private func sanitizeProjectNameForSave(_ s: String) -> String {
+        var out = sanitizeProjectNameForTyping(s)
+        while out.hasPrefix("-") { out.removeFirst() }
+        while out.hasSuffix("-") { out.removeLast() }
+        return out
+    }
+
+    // Browse for directory helper (macOS)
     private func browseForDirectory() {
         #if os(macOS)
         let panel = NSOpenPanel()
@@ -136,7 +158,7 @@ struct AddRepoView: View {
             }
         }
         #else
-        // On non-macOS platforms we could use fileImporter in SwiftUI; for now do nothing
+        // no-op on other platforms
         #endif
     }
 }
