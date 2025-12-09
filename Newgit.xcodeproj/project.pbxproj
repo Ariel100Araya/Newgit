@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BEEFB3602EE7ADD90066731D /* ConfettiSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = BEEFB35F2EE7ADD90066731D /* ConfettiSwiftUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		BECB75132EE49C9600825B30 /* Newgit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Newgit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BEEFB3602EE7ADD90066731D /* ConfettiSwiftUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = Newgit;
 			packageProductDependencies = (
+				BEEFB35F2EE7ADD90066731D /* ConfettiSwiftUI */,
 			);
 			productName = Newgit;
 			productReference = BECB75132EE49C9600825B30 /* Newgit.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = BECB750A2EE49C9500825B30;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BEEFB35E2EE7ADD90066731D /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BECB75142EE49C9600825B30 /* Products */;
 			projectDirPath = "";
@@ -323,6 +332,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BEEFB35E2EE7ADD90066731D /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/simibac/ConfettiSwiftUI.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BEEFB35F2EE7ADD90066731D /* ConfettiSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BEEFB35E2EE7ADD90066731D /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */;
+			productName = ConfettiSwiftUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BECB750B2EE49C9600825B30 /* Project object */;
 }

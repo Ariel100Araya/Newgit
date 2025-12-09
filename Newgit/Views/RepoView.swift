@@ -28,31 +28,28 @@ struct RepoView: View {
     @State private var currentBranch: String = ""
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack {
             HStack {
                 // Left pane: selectable list of changed files
                 VStack { // Removed ScrollView to avoid embedding List inside a ScrollView which can collapse the list
+                    if changedFiles.isEmpty {
+                        VStack {
+                            Text("It seems like there isn't any changed files. Time to get to work!")
+                                .font(.title)
+                                .multilineTextAlignment(.center)
+                                .padding()
+                                .bold()
+                            // I should probably add some buttons for common actions here like Open in Finder, terminal, etc.
+                        }
+                    }
                     VStack(alignment: .leading) {
-                        Text("Changed Files:")
-                            .padding()
-                            .font(.title)
-                            .bold()
-                        
                         if changedFiles.isEmpty {
-                            HStack {
-                                VStack {
-                                    // Show raw output as fallback while loading or if none
-                                    Text(changedFilesFallbackOutput)
-                                        .font(.body)
-                                        .multilineTextAlignment(.leading)
-                                        .lineLimit(nil)
-                                    Text("It seems like there isn't any changed files. Time to get to work!")
-                                        .font(.title3)
-                                        .padding()
-                                }
-                                Spacer()
-                            }
+                            
                         } else {
+                            Text("Changed Files:")
+                                .padding()
+                                .font(.title)
+                                .bold()
                             List(changedFiles, id: \.self) { file in
                                 Button(action: {
                                     selectFile(file)
@@ -155,7 +152,7 @@ struct RepoView: View {
                          
                      }
                      Button("Push") {
-                         
+                         showPush = true
                      }
                      Button("Commit Changes") {
                          
