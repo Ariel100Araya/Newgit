@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct RepoView: View {
     // Make these immutable inputs instead of @State so they update predictably when parent passes new values
@@ -160,14 +161,37 @@ struct RepoView: View {
                  }
                  Menu("Open") {
                      Button("Open workspace in Finder") {
-                         
+                         let homeURL = URL(fileURLWithPath: projectDirectory)
+                         NSWorkspace.shared.activateFileViewerSelecting([homeURL])
                      }
+                     Divider()
                      Button("Open workspace in Xcode") {
-                         
+                         if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                             let config = NSWorkspace.OpenConfiguration()
+                             config.arguments = [projectDirectory]
+                             NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                         }
                      }
                      Button("Open workspace in Visual Studio Code") {
-                         
+                         let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+                         let config = NSWorkspace.OpenConfiguration()
+                         config.arguments = [projectDirectory]
+                         NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
                      }
+                     Divider()
+                     Button("Open directory in Terminal") {
+                         let homePath = NSHomeDirectory()
+                         if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                             let config = NSWorkspace.OpenConfiguration()
+                             config.arguments = [projectDirectory]
+                             NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+                         } else {
+                             // Fallback URL scheme
+                             let url = URL(string: "terminal://\(projectDirectory)")!
+                             NSWorkspace.shared.open(url)
+                         }
+                     }
+                     Divider()
                      Button("Open repository in GitHub") {
                          
                      }
