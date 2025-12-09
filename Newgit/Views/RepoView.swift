@@ -27,6 +27,9 @@ struct RepoView: View {
     // Branch state
     @State private var branches: [String] = []
     @State private var currentBranch: String = ""
+    // Remote update state
+    @State private var needsPull: Bool = false
+    @State private var needsPullCount: Int = 0
 
     var body: some View {
         VStack {
@@ -173,8 +176,20 @@ struct RepoView: View {
         .navigationTitle(repoTitle)
         .toolbar {
             ToolbarItemGroup(placement: .secondaryAction) {
+                // Quick pull button shown when remote has new commits for the current branch
+                if needsPull {
+                    Button(action: { performPull() }) {
+                        HStack {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text("Pull (\(needsPullCount))")
+                        }
+                    }
+                    .padding(.horizontal)
+                    .buttonStyle(.borderless)
+                }
                 // Branch menu: dynamically list branches and allow checkout
                 Menu("Branch: \(currentBranch.isEmpty ? "Main" : currentBranch)") {
+                    // Idea: add new branch action and pull request creation/view
                     ForEach(branches, id: \.self) { branch in
                         Button(action: {
                             checkoutBranch(branch)
@@ -194,14 +209,13 @@ struct RepoView: View {
                 }
                  Menu("Actions") {
                      Button("Pull") {
-                         
+                         performPull()
                      }
                      Button("Push") {
                          showPush = true
                      }
-                     Button("Commit Changes") {
-                         
-                     }
+                     Divider()
+                     // Idea: other git actions like fetch, stash
                  }
                  Menu("Open") {
                      Button("Open workspace in Finder") {
@@ -265,6 +279,10 @@ struct RepoView: View {
          .onAppear {
             loadChangedFiles()
             loadBranches()
+            // Also check for remote updates at view open
+            DispatchQueue.global(qos: .utility).async {
+                self.checkRemoteUpdates()
+            }
          }
         // When the push sheet is dismissed, refresh changed files & branches.
         .onChange(of: showPush) { oldValue, newValue in
@@ -482,6 +500,10 @@ struct RepoView: View {
             } else if self.branches.count > 0 {
                 self.currentBranch = self.branches[0]
             }
+            // After branch resolved, check remote for updates in background
+            DispatchQueue.global(qos: .utility).async {
+                self.checkRemoteUpdates()
+            }
         }
     }
 
@@ -569,6 +591,84 @@ struct RepoView: View {
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3.0) {
             loadChangedFiles()
             loadBranches()
+        }
+    }
+
+    /// Check whether the current branch is behind its upstream (needs pull).
+    /// This runs a `git fetch` then compares HEAD to the upstream to compute behind count.
+    private func checkRemoteUpdates() {
+        guard !currentBranch.isEmpty else {
+            DispatchQueue.main.async {
+                self.needsPull = false
+                self.needsPullCount = 0
+            }
+            return
+        }
+
+        // Fetch the remote refs so we can compare without pulling changes
+        let fetchCmd = "cd \(shellEscape(projectDirectory)) && git fetch --no-tags --prune origin"
+        print("RepoView.checkRemoteUpdates: running: \(fetchCmd)")
+        _ = runCommand(fetchCmd)
+
+        // Resolve the upstream reference for the current branch (@{u}), falling back to origin/<branch>
+        var upstream: String? = nil
+        let upTry = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
+        let upRes = runCommand(upTry)
+        if upRes.status == 0 {
+            let out = upRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !out.isEmpty { upstream = out }
+        }
+        if upstream == nil {
+            upstream = "origin/\(currentBranch)"
+        }
+
+        guard let upstreamRef = upstream else {
+            DispatchQueue.main.async {
+                self.needsPull = false
+                self.needsPullCount = 0
+            }
+            return
+        }
+
+        // Compare HEAD with upstream: returns "<ahead>\t<behind>"
+        let cmp = "cd \(shellEscape(projectDirectory)) && git rev-list --left-right --count HEAD...\(shellEscape(upstreamRef))"
+        print("RepoView.checkRemoteUpdates: running: \(cmp)")
+        let cmpRes = runCommand(cmp)
+        let cmpOut = cmpRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("RepoView.checkRemoteUpdates: exit=\(cmpRes.status) output=\(cmpOut)")
+
+        var behind = 0
+        if cmpRes.status == 0 && !cmpOut.isEmpty {
+            let parts = cmpOut.split { $0 == "\t" || $0 == " " }.map { String($0) }.filter { !$0.isEmpty }
+            if parts.count >= 2, let b = Int(parts[1]) { behind = b }
+        }
+
+        DispatchQueue.main.async {
+            self.needsPullCount = behind
+            self.needsPull = (behind > 0)
+        }
+    }
+
+    /// Perform a git pull and refresh UI state afterwards.
+    private func performPull() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let pullCmd = "cd \(shellEscape(projectDirectory)) && git pull --no-rebase"
+            print("RepoView.performPull: running: \(pullCmd)")
+            let res = runCommand(pullCmd)
+            print("RepoView.performPull: exit=\(res.status) output=\(res.output)")
+
+            // Refresh local state and re-check remote
+            self.refreshRepositoryState()
+            self.checkRemoteUpdates()
+
+            DispatchQueue.main.async {
+                let msg = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if res.status == 0 {
+                    self.showAlert(title: "Pull completed", message: msg.isEmpty ? "Pulled changes successfully." : msg)
+                } else {
+                    self.showAlert(title: "Pull failed", message: msg.isEmpty ? "git pull returned an error." : msg)
+                }
+            }
         }
     }
  }
