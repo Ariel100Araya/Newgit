@@ -31,7 +31,7 @@ struct RepoView: View {
         VStack(alignment: .leading) {
             HStack {
                 // Left pane: selectable list of changed files
-                ScrollView {
+                VStack { // Removed ScrollView to avoid embedding List inside a ScrollView which can collapse the list
                     VStack(alignment: .leading) {
                         Text("Changed Files:")
                             .padding()
@@ -92,10 +92,18 @@ struct RepoView: View {
                                 
                                 ScrollView {
                                     // Use monospaced font so diffs look readable
-                                    Text(selectedFileDiff)
-                                        .padding(.horizontal)
-                                        .font(.system(.body, design: .monospaced))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    if selectedFileDiff.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        Text("Loading diff...")
+                                            .italic()
+                                            .padding(.horizontal)
+                                            .font(.system(.body, design: .monospaced))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    } else {
+                                        Text(selectedFileDiff)
+                                            .padding(.horizontal)
+                                            .font(.system(.body, design: .monospaced))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
                                 }
                             } else {
                                 Text("Click on a file to select it and see its changes")
@@ -236,6 +244,15 @@ struct RepoView: View {
                  self.selectedFile = nil
                  self.selectedFileDiff = ""
              }
+
+             // If nothing is selected but we have changed files, auto-select the first one
+             if self.selectedFile == nil, let first = self.changedFiles.first {
+                 self.selectedFile = first
+                 // load diff for the newly selected file
+                 DispatchQueue.global(qos: .userInitiated).async {
+                     self.loadDiff(for: first)
+                 }
+             }
          }
      }
 
@@ -279,12 +296,53 @@ struct RepoView: View {
      }
 
      private func loadDiff(for file: String) {
-         let cmd = "cd \(shellEscape(projectDirectory)) && git --no-pager diff -- \(shellEscape(file))"
-         print("RepoView.loadDiff: running: \(cmd)")
-         let res = runCommand(cmd)
-         print("RepoView.loadDiff: exit=\(res.status) outputLength=\(res.output.count)")
+         // Try to show the most helpful diff for the file:
+         // 1) Changes against HEAD (includes staged + unstaged differences)
+         // 2) If empty, try staged diff explicitly
+         // 3) If still empty and file is untracked, show the file contents
+         let escapedFile = shellEscape(file)
+         let baseCmd = "cd \(shellEscape(projectDirectory)) && git --no-pager"
+
+         let diffHeadCmd = "\(baseCmd) diff HEAD -- \(escapedFile)"
+         print("RepoView.loadDiff: running: \(diffHeadCmd)")
+         let resHead = runCommand(diffHeadCmd)
+         print("RepoView.loadDiff: headDiff exit=\(resHead.status) outputLength=\(resHead.output.count)")
+
+         var finalOutput = resHead.output
+
+         if finalOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+             // Try staged diff explicitly
+             let stagedCmd = "\(baseCmd) diff --staged -- \(escapedFile)"
+             print("RepoView.loadDiff: running staged: \(stagedCmd)")
+             let resStaged = runCommand(stagedCmd)
+             print("RepoView.loadDiff: stagedDiff exit=\(resStaged.status) outputLength=\(resStaged.output.count)")
+             if !resStaged.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                 finalOutput = resStaged.output
+             } else {
+                 // Check if file is untracked; if so, show its contents
+                 let untrackedCmd = "cd \(shellEscape(projectDirectory)) && git ls-files --others --exclude-standard -- \(escapedFile)"
+                 print("RepoView.loadDiff: checking untracked: \(untrackedCmd)")
+                 let resUntracked = runCommand(untrackedCmd)
+                 let isUntracked = !resUntracked.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                 print("RepoView.loadDiff: untracked exit=\(resUntracked.status) isUntracked=\(isUntracked)")
+                 if isUntracked {
+                     // Show file contents as a preview for the new file
+                     let catCmd = "cd \(shellEscape(projectDirectory)) && cat \(escapedFile)"
+                     print("RepoView.loadDiff: running cat for untracked file: \(catCmd)")
+                     let resCat = runCommand(catCmd)
+                     if !resCat.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                         finalOutput = "(New file) Contents:\n\n" + resCat.output
+                     } else {
+                         finalOutput = "(New file) No readable contents or file is binary."
+                     }
+                 } else {
+                     finalOutput = "No diff available for this file. It may be unchanged in the working tree, or the changes are binary. Try checking staged changes."
+                 }
+             }
+         }
+
          DispatchQueue.main.async {
-             self.selectedFileDiff = res.output
+             self.selectedFileDiff = finalOutput
          }
      }
  }
