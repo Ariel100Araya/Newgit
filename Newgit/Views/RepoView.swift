@@ -27,13 +27,6 @@ struct RepoView: View {
     // Branch state
     @State private var branches: [String] = []
     @State private var currentBranch: String = ""
-    // Remote update state
-    @State private var needsPull: Bool = false
-    @State private var needsPullCount: Int = 0
-    // New branch UI state
-    @State private var showNewBranchSheet: Bool = false
-    @State private var newBranchName: String = ""
-    @State private var newBranchError: String? = nil
 
     var body: some View {
         VStack {
@@ -182,21 +175,6 @@ struct RepoView: View {
             ToolbarItemGroup(placement: .secondaryAction) {
                 // Branch menu: dynamically list branches and allow checkout
                 Menu("Branch: \(currentBranch.isEmpty ? "Main" : currentBranch)") {
-                    Button("New Branch...") {
-                        // clear previous state and present a sheet
-                        newBranchName = ""
-                        newBranchError = nil
-                        showNewBranchSheet = true
-                    }
-                    Divider()
-                    // Idea: add new branch action and pull request creation/view
-                    // Push current branch into main and delete branch (visible when we have a branch selected)
-                    if !currentBranch.isEmpty {
-                        Button("Push to main and delete branch") {
-                            performPushToMain()
-                        }
-                        Divider()
-                    }
                     ForEach(branches, id: \.self) { branch in
                         Button(action: {
                             checkoutBranch(branch)
@@ -210,10 +188,6 @@ struct RepoView: View {
                             }
                         }
                     }
-                    Divider()
-                    Button("Create Pull Request") {
-                        openCreatePullRequest()
-                    }
                     if branches.isEmpty {
                         Button("No branches found") { }
                     }
@@ -225,8 +199,9 @@ struct RepoView: View {
                      Button("Push") {
                          showPush = true
                      }
-                     Divider()
-                     // Idea: other git actions like fetch, stash
+                     Button("Commit Changes") {
+                         
+                     }
                  }
                  Menu("Open") {
                      Button("Open workspace in Finder") {
@@ -266,18 +241,6 @@ struct RepoView: View {
                  }
              }
              ToolbarItemGroup(placement: .primaryAction) {
-                 // Quick pull button shown when remote has new commits for the current branch
-                 if needsPull {
-                     Button(action: { performPull() }) {
-                         HStack {
-                             Image(systemName: "arrow.down.circle.fill")
-                             Text("Pull (\(needsPullCount))")
-                         }
-                     }
-                     .padding(.horizontal)
-                     .buttonStyle(.borderless)
-                     .tint(.purple)
-                 }
                  Button("Push") {
                          showPush = true
                  }
@@ -298,52 +261,10 @@ struct RepoView: View {
                 refreshRepositoryState()
              })
          }
-        // Sheet for creating a new branch
-        .sheet(isPresented: $showNewBranchSheet) {
-            VStack(alignment: .leading) {
-                Text("Create New Branch")
-                    .font(.headline)
-                    .padding(.bottom, 8)
-                TextField("Branch name", text: $newBranchName)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding(.bottom, 8)
-                if let err = newBranchError {
-                    Text(err)
-                        .foregroundColor(.red)
-                        .padding(.bottom, 8)
-                }
-                HStack {
-                    Spacer()
-                    Button("Cancel") {
-                        showNewBranchSheet = false
-                        newBranchName = ""
-                        newBranchError = nil
-                    }
-                    Button("Create") {
-                        // basic validation
-                        let trimmed = newBranchName.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else {
-                            newBranchError = "Branch name cannot be empty"
-                            return
-                        }
-                        showNewBranchSheet = false
-                        createNewBranch(trimmed)
-                    }
-                    .keyboardShortcut(.defaultAction)
-                }
-                .padding(.top, 8)
-            }
-            .padding(20)
-            .frame(width: 420)
-        }
-        // Load the changed files when the view appears
+         // Load the changed files when the view appears
          .onAppear {
             loadChangedFiles()
             loadBranches()
-            // Also check for remote updates at view open
-            DispatchQueue.global(qos: .utility).async {
-                self.checkRemoteUpdates()
-            }
          }
         // When the push sheet is dismissed, refresh changed files & branches.
         .onChange(of: showPush) { oldValue, newValue in
@@ -561,10 +482,6 @@ struct RepoView: View {
             } else if self.branches.count > 0 {
                 self.currentBranch = self.branches[0]
             }
-            // After branch resolved, check remote for updates in background
-            DispatchQueue.global(qos: .utility).async {
-                self.checkRemoteUpdates()
-            }
         }
     }
 
@@ -577,185 +494,7 @@ struct RepoView: View {
         loadBranches()
         loadChangedFiles()
     }
-    
-    /// Create a new branch with the given name and check it out.
-    private func createNewBranch(_ name: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let cmd = "cd \(shellEscape(projectDirectory)) && git checkout -b \(shellEscape(name))"
-            print("RepoView.createNewBranch: running: \(cmd)")
-            let res = runCommand(cmd)
-            print("RepoView.createNewBranch: exit=\(res.status) output=\(res.output)")
 
-            DispatchQueue.main.async {
-                if res.status == 0 {
-                    // success: refresh branches and set current branch
-                    self.refreshRepositoryState()
-                    self.currentBranch = name
-                    self.showAlert(title: "Branch created", message: "Created and switched to branch \(name)")
-                } else {
-                    let msg = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.showAlert(title: "Failed to create branch", message: msg.isEmpty ? "git checkout -b returned an error." : msg)
-                }
-            }
-        }
-    }
-
-    /// Open the repository's GitHub page to create a pull request for the current branch.
-    private func openCreatePullRequest() {
-        guard !currentBranch.isEmpty else {
-            showAlert(title: "No branch selected", message: "Select a branch first.")
-            return
-        }
-
-        // Try to determine the GitHub web URL for the origin remote.
-        let getOrigin = "cd \(shellEscape(projectDirectory)) && git remote get-url origin"
-        let res = runCommand(getOrigin)
-        let remote = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        if remote.isEmpty {
-            showAlert(title: "No remote found", message: "This repository has no configured origin remote.")
-            return
-        }
-
-        guard var web = convertGitRemoteToGitHubWebURL(remote) else {
-            showAlert(title: "Not a GitHub remote", message: "The configured remote does not appear to point to GitHub: \(remote)")
-            return
-        }
-
-        // Construct a pull request creation URL: /pull/new/<branch>
-        // Ensure we don't double-append a trailing slash
-        var base = web.absoluteString
-        if base.hasSuffix("/") { base.removeLast() }
-        let prURLString = "\(base)/pull/new/\(currentBranch)"
-        if let prURL = URL(string: prURLString) {
-            NSWorkspace.shared.open(prURL)
-        } else {
-            showAlert(title: "Couldn't open PR", message: "Failed to construct a valid pull request URL for \(web.absoluteString)")
-        }
-    }
-
-    /// Heuristically pick the repository's main branch name (prefer 'main' then 'master').
-    private func pickMainBranchName() -> String {
-        let candidates = ["main", "master"]
-        for c in candidates {
-            if branches.contains(c) { return c }
-        }
-        // fallback to 'main'
-        return "main"
-    }
-
-    /// Confirm and perform a merge of the current branch into main, push main, delete the branch locally and remotely (if present).
-    private func performPushToMain() {
-        let source = currentBranch
-        let mainBranch = pickMainBranchName()
-
-        if source.isEmpty {
-            showAlert(title: "No branch selected", message: "Select a branch to push to main.")
-            return
-        }
-
-        if source == mainBranch {
-            showAlert(title: "Already on main", message: "You are already on \(mainBranch).")
-            return
-        }
-
-        // Ask for confirmation on main thread
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Push \(source) to \(mainBranch) and delete branch?"
-            alert.informativeText = "This will checkout \(mainBranch), merge \(source) into \(mainBranch), push \(mainBranch) to remote, and delete branch \(source) locally (and remotely if present)."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Push & Delete")
-            alert.addButton(withTitle: "Cancel")
-            if let window = NSApplication.shared.keyWindow {
-                alert.beginSheetModal(for: window) { response in
-                    if response == .alertFirstButtonReturn {
-                        // User confirmed
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            self.executePushToMain(sourceBranch: source, mainBranch: mainBranch)
-                        }
-                    }
-                }
-            } else {
-                let resp = alert.runModal()
-                if resp == .alertFirstButtonReturn {
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        self.executePushToMain(sourceBranch: source, mainBranch: mainBranch)
-                    }
-                }
-            }
-        }
-    }
-
-    private func executePushToMain(sourceBranch: String, mainBranch: String) {
-        var summary = ""
-
-        // 1) Checkout main
-        let checkoutMain = "cd \(shellEscape(projectDirectory)) && git checkout \(shellEscape(mainBranch))"
-        print("RepoView.executePushToMain: running: \(checkoutMain)")
-        let res1 = runCommand(checkoutMain)
-        summary += "checkout: \(res1.output)\n"
-        if res1.status != 0 {
-            DispatchQueue.main.async {
-                self.showAlert(title: "Failed to checkout \(mainBranch)", message: res1.output)
-            }
-            return
-        }
-
-        // 2) Merge source into main (attempt a no-ff merge)
-        let mergeCmd = "cd \(shellEscape(projectDirectory)) && git merge --no-ff --no-edit \(shellEscape(sourceBranch))"
-        print("RepoView.executePushToMain: running: \(mergeCmd)")
-        let res2 = runCommand(mergeCmd)
-        summary += "merge: \(res2.output)\n"
-        if res2.status != 0 {
-            // Merge failed (possibly conflicts). Try to go back to source branch to leave user in a safe state.
-            let backCmd = "cd \(shellEscape(projectDirectory)) && git checkout \(shellEscape(sourceBranch))"
-            _ = runCommand(backCmd)
-            DispatchQueue.main.async {
-                self.showAlert(title: "Merge failed", message: "Merge failed: \(res2.output)\nChecked out back to \(sourceBranch). Resolve conflicts manually.")
-            }
-            return
-        }
-
-        // 3) Push main to origin
-        let pushMain = "cd \(shellEscape(projectDirectory)) && git push origin \(shellEscape(mainBranch))"
-        print("RepoView.executePushToMain: running: \(pushMain)")
-        let res3 = runCommand(pushMain)
-        summary += "push: \(res3.output)\n"
-        if res3.status != 0 {
-            DispatchQueue.main.async {
-                self.showAlert(title: "Failed to push \(mainBranch)", message: res3.output)
-            }
-            return
-        }
-
-        // 4) Delete local branch
-        let delLocal = "cd \(shellEscape(projectDirectory)) && git branch -d \(shellEscape(sourceBranch))"
-        print("RepoView.executePushToMain: running: \(delLocal)")
-        let res4 = runCommand(delLocal)
-        summary += "delete-local: \(res4.output)\n"
-
-        // 5) If remote branch exists, delete remote branch
-        let remoteCheck = "cd \(shellEscape(projectDirectory)) && git ls-remote --heads origin \(shellEscape(sourceBranch))"
-        let remRes = runCommand(remoteCheck)
-        if !remRes.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let delRemote = "cd \(shellEscape(projectDirectory)) && git push origin --delete \(shellEscape(sourceBranch))"
-            print("RepoView.executePushToMain: running: \(delRemote)")
-            let res5 = runCommand(delRemote)
-            summary += "delete-remote: \(res5.output)\n"
-        } else {
-            summary += "delete-remote: (no remote branch found)\n"
-        }
-
-        // Refresh state
-        self.refreshRepositoryState()
-        self.checkRemoteUpdates()
-
-        // Show summary
-        DispatchQueue.main.async {
-            self.showAlert(title: "Push to main completed", message: summary)
-        }
-    }
- 
      private func selectFile(_ file: String) {
          selectedFile = file
          loadDiff(for: file)
@@ -812,6 +551,28 @@ struct RepoView: View {
          }
      }
 
+    /// Perform a git pull and refresh UI state afterwards.
+    private func performPull() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let pullCmd = "cd \(shellEscape(projectDirectory)) && git pull --no-rebase"
+            print("RepoView.performPull: running: \(pullCmd)")
+            let res = runCommand(pullCmd)
+            print("RepoView.performPull: exit=\(res.status) output=\(res.output)")
+
+            // Refresh local state
+            self.refreshRepositoryState()
+
+            DispatchQueue.main.async {
+                let msg = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if res.status == 0 {
+                    self.showAlert(title: "Pull completed", message: msg.isEmpty ? "Pulled changes successfully." : msg)
+                } else {
+                    self.showAlert(title: "Pull failed", message: msg.isEmpty ? "git pull returned an error." : msg)
+                }
+            }
+        }
+    }
+
     // Run an immediate refresh in the background and schedule follow-up refreshes
     // to handle any timing races with git or other processes.
     private func refreshRepositoryState() {
@@ -833,81 +594,4 @@ struct RepoView: View {
         }
     }
 
-    /// Check whether the current branch is behind its upstream (needs pull).
-    /// This runs a `git fetch` then compares HEAD to the upstream to compute behind count.
-    private func checkRemoteUpdates() {
-        guard !currentBranch.isEmpty else {
-            DispatchQueue.main.async {
-                self.needsPull = false
-                self.needsPullCount = 0
-            }
-            return
-        }
-
-        // Fetch the remote refs so we can compare without pulling changes
-        let fetchCmd = "cd \(shellEscape(projectDirectory)) && git fetch --no-tags --prune origin"
-        print("RepoView.checkRemoteUpdates: running: \(fetchCmd)")
-        _ = runCommand(fetchCmd)
-
-        // Resolve the upstream reference for the current branch (@{u}), falling back to origin/<branch>
-        var upstream: String? = nil
-        let upTry = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
-        let upRes = runCommand(upTry)
-        if upRes.status == 0 {
-            let out = upRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !out.isEmpty { upstream = out }
-        }
-        if upstream == nil {
-            upstream = "origin/\(currentBranch)"
-        }
-
-        guard let upstreamRef = upstream else {
-            DispatchQueue.main.async {
-                self.needsPull = false
-                self.needsPullCount = 0
-            }
-            return
-        }
-
-        // Compare HEAD with upstream: returns "<ahead>\t<behind>"
-        let cmp = "cd \(shellEscape(projectDirectory)) && git rev-list --left-right --count HEAD...\(shellEscape(upstreamRef))"
-        print("RepoView.checkRemoteUpdates: running: \(cmp)")
-        let cmpRes = runCommand(cmp)
-        let cmpOut = cmpRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        print("RepoView.checkRemoteUpdates: exit=\(cmpRes.status) output=\(cmpOut)")
-
-        var behind = 0
-        if cmpRes.status == 0 && !cmpOut.isEmpty {
-            let parts = cmpOut.split { $0 == "\t" || $0 == " " }.map { String($0) }.filter { !$0.isEmpty }
-            if parts.count >= 2, let b = Int(parts[1]) { behind = b }
-        }
-
-        DispatchQueue.main.async {
-            self.needsPullCount = behind
-            self.needsPull = (behind > 0)
-        }
-    }
-
-    /// Perform a git pull and refresh UI state afterwards.
-    private func performPull() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let pullCmd = "cd \(shellEscape(projectDirectory)) && git pull --no-rebase"
-            print("RepoView.performPull: running: \(pullCmd)")
-            let res = runCommand(pullCmd)
-            print("RepoView.performPull: exit=\(res.status) output=\(res.output)")
-
-            // Refresh local state and re-check remote
-            self.refreshRepositoryState()
-            self.checkRemoteUpdates()
-
-            DispatchQueue.main.async {
-                let msg = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
-                if res.status == 0 {
-                    self.showAlert(title: "Pull completed", message: msg.isEmpty ? "Pulled changes successfully." : msg)
-                } else {
-                    self.showAlert(title: "Pull failed", message: msg.isEmpty ? "git pull returned an error." : msg)
-                }
-            }
-        }
-    }
- }
+}
