@@ -118,7 +118,7 @@ struct PushView: View {
                 if success {
                     self.showSuccessView = true
                     // show for 5 seconds then dismiss
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         self.showSuccessView = false
                         self.dismiss()
                     }
