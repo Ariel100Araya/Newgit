@@ -180,7 +180,6 @@ struct RepoView: View {
                      }
                      Divider()
                      Button("Open directory in Terminal") {
-                         let homePath = NSHomeDirectory()
                          if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
                              let config = NSWorkspace.OpenConfiguration()
                              config.arguments = [projectDirectory]
@@ -193,7 +192,7 @@ struct RepoView: View {
                      }
                      Divider()
                      Button("Open repository in GitHub") {
-                         
+                         openRepositoryInGitHub()
                      }
                  }
              }
@@ -218,8 +217,111 @@ struct RepoView: View {
      // MARK: - Helpers
      private func shellEscape(_ s: String) -> String {
          // Safely single-quote a string for use in bash -c
-         return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+         return "'" + s.replacingOccurrences(of: "'", with: "'\\'\''") + "'"
      }
+
+    // Try to open the repository page on GitHub if a GitHub remote is configured.
+    private func openRepositoryInGitHub() {
+        // Attempt to read the origin remote first
+        let getOrigin = "cd \(shellEscape(projectDirectory)) && git remote get-url origin"
+        print("RepoView.openRepositoryInGitHub: running: \(getOrigin)")
+        var res = runCommand(getOrigin)
+        var candidate = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if candidate.isEmpty {
+            // Fallback: inspect git remote -v and pick the first URL
+            let listRemotes = "cd \(shellEscape(projectDirectory)) && git remote -v"
+            print("RepoView.openRepositoryInGitHub: running fallback: \(listRemotes)")
+            res = runCommand(listRemotes)
+            let lines = res.output.split { $0 == "\n" || $0 == "\r" }.map { String($0) }
+            for line in lines {
+                // expected format: "origin\t<url> (fetch)" or similar
+                let parts = line.split(separator: "\t", maxSplits: 1).map { String($0) }
+                if parts.count >= 2 {
+                    // take the url portion and trim any trailing " (fetch)" text
+                    var urlPart = parts[1]
+                    if let paren = urlPart.range(of: " (fetch)") {
+                        urlPart = String(urlPart[..<paren.lowerBound])
+                    } else if let paren2 = urlPart.range(of: " (push)") {
+                        urlPart = String(urlPart[..<paren2.lowerBound])
+                    }
+                    candidate = urlPart.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !candidate.isEmpty { break }
+                }
+            }
+        }
+
+        if candidate.isEmpty {
+            showAlert(title: "No remote found", message: "This repository has no configured git remotes.")
+            return
+        }
+
+        if let url = convertGitRemoteToGitHubWebURL(candidate) {
+            print("RepoView.openRepositoryInGitHub: opening url: \(url.absoluteString)")
+            NSWorkspace.shared.open(url)
+        } else {
+            showAlert(title: "Not a GitHub remote", message: "The configured remote does not appear to point to GitHub: \(candidate)")
+        }
+    }
+
+    private func convertGitRemoteToGitHubWebURL(_ remote: String) -> URL? {
+        var s = remote.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Remove .git suffix if present
+        if s.hasSuffix(".git") {
+            s = String(s.dropLast(4))
+        }
+
+        // git@github.com:owner/repo  -> https://github.com/owner/repo
+        if s.hasPrefix("git@github.com:") {
+            let path = String(s.dropFirst("git@github.com:".count))
+            return URL(string: "https://github.com/\(path)")
+        }
+
+        // ssh://git@github.com/owner/repo -> https://github.com/owner/repo
+        if s.hasPrefix("ssh://") || s.contains("git@github.com") {
+            if let range = s.range(of: "github.com") {
+                let after = s[range.upperBound...]
+                let path = after.hasPrefix("/") ? String(after) : "/" + String(after)
+                return URL(string: "https://github.com\(path)")
+            }
+        }
+
+        // http(s)://...github.com/owner/repo
+        if s.contains("github.com") {
+            // Ensure scheme
+            if s.hasPrefix("http://") || s.hasPrefix("https://") {
+                return URL(string: s)
+            } else if s.hasPrefix("github.com/") {
+                return URL(string: "https://\(s)")
+            } else {
+                // Unknown but contains github.com
+                if let idx = s.range(of: "github.com") {
+                    let suffix = s[idx.lowerBound...]
+                    let trimmed = suffix.hasPrefix("github.com") ? String(suffix) : String(suffix)
+                    if trimmed.hasPrefix("github.com") {
+                        return URL(string: "https://\(trimmed)")
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func showAlert(title: String, message: String) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            if let window = NSApplication.shared.keyWindow {
+                alert.beginSheetModal(for: window, completionHandler: nil)
+            } else {
+                alert.runModal()
+            }
+        }
+    }
 
      private func loadChangedFiles() {
          // Use `git status --porcelain` to capture staged, unstaged and untracked files.
