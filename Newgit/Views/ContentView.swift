@@ -81,6 +81,25 @@ struct ContentView: View {
             if selectionID == nil, let first = savedRepos.first {
                 selectionID = first.id
             }
+            #if os(macOS)
+            NotificationCenter.default.addObserver(forName: .newgitCloneRepo, object: nil, queue: .main) { _ in
+                showCloneRepo = true
+            }
+            NotificationCenter.default.addObserver(forName: .newgitAddNewRepo, object: nil, queue: .main) { _ in
+                showAddNewRepo = true
+            }
+            NotificationCenter.default.addObserver(forName: .newgitAddExistingRepo, object: nil, queue: .main) { _ in
+                showAddRepo = true
+            }
+            #endif
+        })
+
+        anyView = AnyView(anyView.onDisappear {
+            #if os(macOS)
+            NotificationCenter.default.removeObserver(self, name: .newgitCloneRepo, object: nil)
+            NotificationCenter.default.removeObserver(self, name: .newgitAddNewRepo, object: nil)
+            NotificationCenter.default.removeObserver(self, name: .newgitAddExistingRepo, object: nil)
+            #endif
         })
 
         anyView = AnyView(anyView.onChange(of: savedRepos) { oldRepos, newRepos in
@@ -101,6 +120,15 @@ struct ContentView: View {
                 debugSelectedName = repo.name
             }
         })
+
+        // Provide a top-level Touch Bar on macOS so items appear in the responder chain
+#if os(macOS)
+        anyView = AnyView(anyView.touchBar(content: {
+            Button("Clone Repository") { showCloneRepo = true }
+            Button("Add New Repository") { showAddNewRepo = true }
+            Button("Add Existing Repository") { showAddRepo = true }
+        }))
+#endif
 
         return anyView
     }
@@ -126,6 +154,11 @@ struct ContentView: View {
                 }
             }
             .listStyle(.sidebar)
+            .touchBar(content: {
+                Button("Clone Repository") { showCloneRepo = true }
+                Button("Add New Repository") { showAddNewRepo = true }
+                Button("Add Existing Repository") { showAddRepo = true }
+            })
         }
         .cornerRadius(12)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)

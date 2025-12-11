@@ -14,6 +14,19 @@ struct NewgitApp: App {
         WindowGroup {
             RootView()
                 .modelContainer(for: [SavedRepo.self])
+#if os(macOS)
+                .touchBar(content: {
+                    Button("Clone Repository") {
+                        NotificationCenter.default.post(name: .newgitCloneRepo, object: nil)
+                    }
+                    Button("Add New Repository") {
+                        NotificationCenter.default.post(name: .newgitAddNewRepo, object: nil)
+                    }
+                    Button("Add Existing Repository") {
+                        NotificationCenter.default.post(name: .newgitAddExistingRepo, object: nil)
+                    }
+                })
+#endif
         }
     }
 }

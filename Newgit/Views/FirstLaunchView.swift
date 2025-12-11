@@ -102,6 +102,17 @@ struct FirstLaunchView: View {
                         .glassEffect()
                     }
                     .padding()
+                    .touchBar(content: {
+                        Button("Clone Repository") {
+                            cloneRepo()
+                        }
+                        Button("Add existing Repository") {
+                            addExistingRepo()
+                        }
+                        Button("Add new Repository") {
+                            addNewRepo()
+                        }
+                    })
                 }
                 .padding()
             } else {
