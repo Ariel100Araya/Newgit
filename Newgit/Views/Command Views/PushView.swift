@@ -47,12 +47,18 @@ struct PushView: View {
                 HStack {
                     TextField("Enter a push title", text: $pushTitle)
                         .padding(.trailing)
+                        .onSubmit {
+                            performPush()
+                            trigger += 1
+                        }
                     Button(action: {
                         performPush()
                         trigger += 1
                     }) {
                         Text(isProcessing ? "Working..." : "Push")
                     }
+                    .glassEffect()
+                    .buttonStyle(.borderedProminent)
                     .disabled(isProcessing)
                     .padding()
                 }
