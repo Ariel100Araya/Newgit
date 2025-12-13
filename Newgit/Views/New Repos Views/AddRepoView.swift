@@ -51,12 +51,14 @@ struct AddRepoView: View {
 
                 let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
                 modelContext.insert(repo)
+                print("AddRepoView: inserted repo \(sanitizedTitle) id=\(repo.id)")
                 do {
                     try modelContext.save()
                     saveMessage = "Saved \(sanitizedTitle)"
+                    print("AddRepoView: modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
                 } catch {
                     saveMessage = "Save failed: \(error.localizedDescription)"
-                    print("ModelContext save error: \(error)")
+                    print("AddRepoView: modelContext.save() failed: \(error)")
                 }
                 showSaveAlert = true
                 // Clear inputs after adding
@@ -83,6 +85,7 @@ struct AddRepoView: View {
                     for index in indices {
                         let repo = savedRepos[index]
                         modelContext.delete(repo)
+                        print("AddRepoView: deleted repo id=\(repo.id)")
                     }
                 }
             }
@@ -105,12 +108,14 @@ struct AddRepoView: View {
 
                     let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
                     modelContext.insert(repo)
+                    print("AddRepoView(toolbar): inserted repo \(sanitizedTitle) id=\(repo.id)")
                     do {
                         try modelContext.save()
                         saveMessage = "Saved \(sanitizedTitle)"
+                        print("AddRepoView(toolbar): modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
                     } catch {
                         saveMessage = "Save failed: \(error.localizedDescription)"
-                        print("ModelContext save error: \(error)")
+                        print("AddRepoView(toolbar): modelContext.save() failed: \(error)")
                     }
                     showSaveAlert = true
                     // Clear inputs after adding

@@ -20,22 +20,48 @@ struct FirstLaunchView: View {
     @State private var ghAuthenticated: Bool? = nil
     @State private var githubUser: String? = nil
     @State private var githubAvatarURL: URL? = nil
-    @State private var isChecking: Bool = false
+    // Start in checking state so the UI shows a spinner immediately on launch
+    @State private var isChecking: Bool = true
     @State private var lastError: String? = nil
+    // Controls whether the welcome action buttons are visible (fades in after the greeting)
+    @State private var showWelcomeActions: Bool = false
+    // Controls whether confetti animation is visible (short burst when welcome appears)
+    @State private var showConfetti: Bool = false
     // Internal sheet flags (used if the host didn't provide callbacks)
     @State private var showCloneRepoSheet: Bool = false
     @State private var showAddExistingRepoSheet: Bool = false
     @State private var showAddNewRepoSheet: Bool = false
 
     var body: some View {
-        Group {
-            // If checks are done and no missing prereqs, show the welcome + repo actions
-            if !isChecking && missingPrereqs().isEmpty {
+        // Use a ZStack so spinner and content can crossfade using opacity transitions
+        ZStack {
+            // Confetti overlay (appears on top)
+//            if showConfetti {
+//                ConfettiView()
+//                    .allowsHitTesting(false)
+//                    .transition(.opacity)
+//            }
+            // Spinner layer
+            if isChecking {
                 VStack {
-                    // Welcome header (avatar + username)
-                    if let user = githubUser {
-                        HStack(spacing: 12) {
-                            if let avatar = githubAvatarURL {
+                    Spacer()
+                    ProgressView("Get ready…")
+                        .scaleEffect(1.1)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+                .transition(.opacity)
+            }
+
+            // Content layer (welcome or env check) — appears when not checking
+            if !isChecking {
+                // After checks complete: if we have a logged-in GitHub user show the welcome UI, otherwise show the environment-check UI
+                if let user = githubUser {
+                    VStack {
+                        // Welcome header (avatar + username)
+                        if let avatar = githubAvatarURL {
+                            HStack(spacing: 12) {
                                 AsyncImage(url: avatar) { phase in
                                     switch phase {
                                     case .empty:
@@ -56,187 +82,219 @@ struct FirstLaunchView: View {
                                 }
                                 .frame(width: 64, height: 64)
                                 .clipShape(Circle())
-                            } else {
-                                Image(systemName: "person.crop.circle")
-                                    .resizable()
-                                    .frame(width: 64, height: 64)
-                            }
 
-                            VStack(alignment: .leading) {
-                                Text("Welcome to Newgit,")
-                                    .font(.title2)
-                                    .foregroundColor(.secondary)
-                                Text(user + "!")
-                                    .font(.largeTitle)
-                                    .bold()
-                            }
-                        }
-                    } else {
-                        Text("Welcome!")
-                            .font(.largeTitle)
-                            .bold()
-                    }
-                    Text("Get started by cloning a repository or creating a new one.")
-                        .foregroundColor(.secondary)
-                        .padding()
-                        .font(.title2)
-                    // Action buttons
-                    HStack {
-                        Button("Clone Repository") {
-                            cloneRepo()
-                        }
-                        .padding()
-                        .buttonStyle(.borderless)
-                        .glassEffect()
-                        Button("Add existing Repository") {
-                            addExistingRepo()
-                        }
-                        .padding()
-                        .buttonStyle(.borderless)
-                        .glassEffect()
-                        Button("Add new Repository") {
-                            addNewRepo()
-                        }
-                        .padding()
-                        .buttonStyle(.borderless)
-                        .glassEffect()
-                    }
-                    .padding()
-                    .touchBar(content: {
-                        Button("Clone Repository") {
-                            cloneRepo()
-                        }
-                        Button("Add existing Repository") {
-                            addExistingRepo()
-                        }
-                        Button("Add new Repository") {
-                            addNewRepo()
-                        }
-                    })
-                }
-                .padding()
-            } else {
-                // ...existing environment-check UI...
-                VStack(spacing: 16) {
-                    Text("Environment check")
-                        .font(.title2)
-                        .bold()
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        statusRow(title: "Homebrew (brew)", present: hasBrew, presentAction: {
-                            // Open Homebrew homepage
-                            if let url = URL(string: "https://brew.sh") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }, absentAction: {
-                            copyToPasteboard("/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
-                        })
-
-                        statusRow(title: "GitHub CLI (gh)", present: hasGH, presentAction: {
-                            if let url = URL(string: "https://cli.github.com/") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }, absentAction: {
-                            copyToPasteboard("brew install gh")
-                        })
-
-                        statusRow(title: "gh authenticated", present: ghAuthenticated, presentAction: {
-                            if let url = URL(string: "https://docs.github.com/en/github-cli/authenticating-with-github-cli") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }, absentAction: {
-                            copyToPasteboard("gh auth login")
-                        }, absentLabel: "Run 'gh auth login' to authenticate")
-                    }
-                    .padding()
-                    .frame(maxWidth: 720)
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
-
-                    if isChecking {
-                        ProgressView("Checking…")
-                    }
-
-                    HStack(spacing: 12) {
-                        Button(action: { checkPrereqs() }) {
-                            Text("Refresh")
-                        }
-                        .keyboardShortcut("r", modifiers: .command)
-
-                        Button(action: { openTerminalInstructions() }) {
-                            Text("Open Terminal")
-                        }
-                    }
-
-                    // Show a concise summary of missing prerequisites when checks are done
-                    if !isChecking {
-                        let missing = missingPrereqs()
-                        if !missing.isEmpty {
-                            Text("Remaining: \(missing.joined(separator: ", "))")
-                                .foregroundColor(.secondary)
-                                .font(.footnote)
-                        } else {
-                            // All prerequisites satisfied — if we have an authenticated GH user show welcome
-                            if let user = githubUser {
-                                HStack(spacing: 12) {
-                                    if let avatar = githubAvatarURL {
-                                        // AsyncImage is available on macOS 12+
-                                        AsyncImage(url: avatar) { phase in
-                                            switch phase {
-                                            case .empty:
-                                                ProgressView()
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .scaledToFill()
-                                            case .failure:
-                                                Image(systemName: "person.crop.circle")
-                                                    .resizable()
-                                                    .scaledToFit()
-                                            @unknown default:
-                                                Image(systemName: "person.crop.circle")
-                                                    .resizable()
-                                                    .scaledToFit()
-                                            }
-                                        }
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                    } else {
-                                        Image(systemName: "person.crop.circle")
-                                            .resizable()
-                                            .frame(width: 48, height: 48)
-                                    }
-
-                                    VStack(alignment: .leading) {
-                                        Text("Welcome,")
-                                            .font(.title2)
-                                        Text(user + "!").bold()
-                                            .font(.title)
-                                    }
+                                VStack(alignment: .leading) {
+                                    Text("Welcome to Newgit,")
+                                        .font(.title2)
+                                        .foregroundColor(.secondary)
+                                    Text(user + "!")
+                                        .font(.largeTitle)
+                                        .bold()
                                 }
-                                .foregroundColor(.primary)
-                                .font(.headline)
-                            } else {
-                                Text("All prerequisites satisfied")
-                                    .foregroundColor(.green)
-                                    .font(.footnote)
                             }
+                        } else {
+                            Text("Welcome!")
+                                .font(.largeTitle)
+                                .bold()
+                        }
+                        Text("Get started by cloning a repository or creating a new one.")
+                            .foregroundColor(.secondary)
+                            .padding()
+                            .font(.title2)
+                        // Action buttons: fade them in after the greeting using showWelcomeActions
+                        if showWelcomeActions {
+                            HStack {
+                                Button("Clone Repository") {
+                                    cloneRepo()
+                                }
+                                .padding()
+                                .buttonStyle(.borderless)
+                                .glassEffect()
+                                Button("Add existing Repository") {
+                                    addExistingRepo()
+                                }
+                                .padding()
+                                .buttonStyle(.borderless)
+                                .glassEffect()
+                                Button("Add new Repository") {
+                                    addNewRepo()
+                                }
+                                .padding()
+                                .buttonStyle(.borderless)
+                                .glassEffect()
+                            }
+                            .padding()
+                            .transition(.opacity)
+                            .touchBar(content: {
+                                Button("Clone Repository") {
+                                    cloneRepo()
+                                }
+                                Button("Add existing Repository") {
+                                    addExistingRepo()
+                                }
+                                Button("Add new Repository") {
+                                    addNewRepo()
+                                }
+                            })
                         }
                     }
+                    .padding()
+                } else {
+                    // ...existing environment-check UI...
+                    VStack(spacing: 16) {
+                        Text("Environment check")
+                            .font(.title2)
+                            .bold()
 
-                    if let err = lastError {
-                        Text(err)
-                            .foregroundColor(.red)
-                            .font(.footnote)
+                        VStack(alignment: .leading, spacing: 12) {
+                            statusRow(title: "Homebrew (brew)", present: hasBrew, presentAction: {
+                                // Open Homebrew homepage
+                                if let url = URL(string: "https://brew.sh") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }, absentAction: {
+                                copyToPasteboard("/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
+                            })
+
+                            statusRow(title: "GitHub CLI (gh)", present: hasGH, presentAction: {
+                                if let url = URL(string: "https://cli.github.com/") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }, absentAction: {
+                                copyToPasteboard("brew install gh")
+                            })
+
+                            statusRow(title: "gh authenticated", present: ghAuthenticated, presentAction: {
+                                if let url = URL(string: "https://docs.github.com/en/github-cli/authenticating-with-github-cli") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }, absentAction: {
+                                copyToPasteboard("gh auth login")
+                            }, absentLabel: "Run 'gh auth login' to authenticate")
+                        }
+                        .padding()
+                        .frame(maxWidth: 720)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(10)
+
+                        if isChecking {
+                            ProgressView("Checking…")
+                        }
+
+                        HStack(spacing: 12) {
+                            Button(action: { checkPrereqs() }) {
+                                Text("Refresh")
+                            }
+                            .keyboardShortcut("r", modifiers: .command)
+
+                            Button(action: { openTerminalInstructions() }) {
+                                Text("Open Terminal")
+                            }
+                        }
+
+                        // Show a concise summary of missing prerequisites when checks are done
+                        if !isChecking {
+                            let missing = missingPrereqs()
+                            if !missing.isEmpty {
+                                Text("Remaining: \(missing.joined(separator: ", "))")
+                                    .foregroundColor(.secondary)
+                                    .font(.footnote)
+                            } else {
+                                // All prerequisites satisfied — if we have an authenticated GH user show welcome
+                                if let user = githubUser {
+                                    HStack(spacing: 12) {
+                                        if let avatar = githubAvatarURL {
+                                            // AsyncImage is available on macOS 12+
+                                            AsyncImage(url: avatar) { phase in
+                                                switch phase {
+                                                case .empty:
+                                                    ProgressView()
+                                                case .success(let image):
+                                                    image
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                case .failure:
+                                                    Image(systemName: "person.crop.circle")
+                                                        .resizable()
+                                                        .scaledToFit()
+                                                @unknown default:
+                                                    Image(systemName: "person.crop.circle")
+                                                        .resizable()
+                                                        .scaledToFit()
+                                                }
+                                            }
+                                            .frame(width: 48, height: 48)
+                                            .clipShape(Circle())
+                                        } else {
+                                            Image(systemName: "person.crop.circle")
+                                                .resizable()
+                                                .frame(width: 48, height: 48)
+                                        }
+
+                                        VStack(alignment: .leading) {
+                                            Text("Welcome,")
+                                                .font(.title2)
+                                            Text(user + "!").bold()
+                                                .font(.title)
+                                        }
+                                    }
+                                    .foregroundColor(.primary)
+                                    .font(.headline)
+                                } else {
+                                    Text("All prerequisites satisfied")
+                                        .foregroundColor(.green)
+                                        .font(.footnote)
+                                }
+                            }
+                        }
+
+                        if let err = lastError {
+                            Text(err)
+                                .foregroundColor(.red)
+                                .font(.footnote)
+                        }
+
+                        Spacer()
                     }
-
-                    Spacer()
+                    .padding()
                 }
-                .padding()
             }
         }
+        // Animate cross-fade between spinner and content
+        .animation(.easeInOut(duration: 0.25), value: isChecking)
+        // Animate welcome action appearance
+        .animation(.easeInOut(duration: 0.25), value: showWelcomeActions)
         .padding()
-        .onAppear { checkPrereqs() }
+        .onAppear {
+            // ensure actions are hidden while checking starts
+            showWelcomeActions = false
+            checkPrereqs()
+        }
+        // Show welcome actions shortly after a user is detected; also trigger a short confetti burst
+        .onChange(of: githubUser) { old, new in
+            if new != nil {
+                // Delay slightly so the greeting appears first, then fade in actions
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    withAnimation { showWelcomeActions = true }
+                }
+                // Trigger confetti for a short burst
+                withAnimation {
+                    showConfetti = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation { showConfetti = false }
+                }
+            } else {
+                withAnimation { showWelcomeActions = false }
+                withAnimation { showConfetti = false }
+            }
+        }
+        // If checks start again, hide actions immediately
+        .onChange(of: isChecking) { old, checking in
+            if checking {
+                withAnimation { showWelcomeActions = false }
+            }
+        }
         // Present sheets locally if callbacks are not provided by the host
         .sheet(isPresented: $showCloneRepoSheet) {
             CloneRepoView()
@@ -438,4 +496,85 @@ struct FirstLaunchView: View {
 
 #Preview {
     FirstLaunchView()
+}
+
+// MARK: - Confetti (macOS)
+// Lightweight CAEmitterLayer-based confetti view for macOS.
+fileprivate struct ConfettiView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        v.wantsLayer = true
+        v.translatesAutoresizingMaskIntoConstraints = false
+
+        // Create emitter
+        let emitter = CAEmitterLayer()
+        emitter.emitterShape = .line
+        emitter.emitterMode = .surface
+        emitter.birthRate = 1
+
+        // We'll size/position the emitter in layout pass
+        v.layer?.addSublayer(emitter)
+        context.coordinator.emitter = emitter
+
+        // When view is added, kick off the burst
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            guard let superlayer = v.layer else { return }
+            emitter.frame = superlayer.bounds
+            emitter.emitterPosition = CGPoint(x: superlayer.bounds.midX, y: superlayer.bounds.maxY)
+            emitter.emitterSize = CGSize(width: superlayer.bounds.width, height: 1)
+            emitter.emitterCells = generateCells()
+            // short-lived burst: let cells emit for a moment then stop
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                emitter.birthRate = 0
+            }
+            // remove emitter after a while
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                emitter.removeFromSuperlayer()
+            }
+        }
+
+        return v
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // no-op
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    class Coordinator {
+        var emitter: CAEmitterLayer?
+    }
+
+    // Helper: produce several colored CAEmitterCell instances
+    private func generateCells() -> [CAEmitterCell] {
+        let colors: [NSColor] = [NSColor.systemRed, NSColor.systemBlue, NSColor.systemGreen, NSColor.systemOrange, NSColor.systemPink, NSColor.systemYellow]
+        return colors.map { color in
+            let cell = CAEmitterCell()
+            cell.birthRate = 300
+            cell.lifetime = 3.0
+            cell.velocity = 200
+            cell.velocityRange = 120
+            cell.emissionLongitude = -.pi/2
+            cell.emissionRange = .pi/3
+            cell.spin = 3
+            cell.spinRange = 4
+            cell.scale = 0.6
+            cell.scaleRange = 0.4
+            if let img = makeImage(color: color, size: CGSize(width: 10, height: 14)) {
+                cell.contents = img
+            }
+            return cell
+        }
+    }
+
+    private func makeImage(color: NSColor, size: CGSize) -> CGImage? {
+        let w = Int(max(1, size.width))
+        let h = Int(max(1, size.height))
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.setFillColor(color.cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h)))
+        return ctx.makeImage()
+    }
 }

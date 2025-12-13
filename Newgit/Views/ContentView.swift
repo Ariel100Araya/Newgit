@@ -202,13 +202,15 @@ struct ContentView: View {
             selectionID = nil
         }
 
+        print("ContentView: deleting repo id=\(repo.id) name=\(repo.name)")
         modelContext.delete(repo)
         do {
             try modelContext.save()
             deleteResultMessage = "Deleted \(repo.name)"
+            print("ContentView: modelContext.save() succeeded")
         } catch {
             deleteResultMessage = "Failed to delete saved repo: \(error.localizedDescription)"
-            print("ModelContext save error: \(error)")
+            print("ContentView: modelContext.save() failed: \(error)")
         }
         showDeleteResultAlert = true
         repoToDelete = nil
