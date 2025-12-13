@@ -3,7 +3,7 @@
 ### This app is in Beta! If you have any issue open an issue or just email me at ariel@prettycoolwebsite.com. 
 
 ## Hi there!
-Hi! My name is Ariel and this is Newgit (pronounced new git) if you find a better for this project, please let me know. 
+Hi! My name is Ariel and this is Newgit (pronounced new git) if you find a better name for this project, please let me know. 
 
 ![Welcome!](screenshots/s3.png)
 
