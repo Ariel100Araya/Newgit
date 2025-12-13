@@ -27,6 +27,8 @@ struct RepoView: View {
     // Branch state
     @State private var branches: [String] = []
     @State private var currentBranch: String = ""
+    // Whether Push action should be enabled
+    @State private var canPush: Bool = false
     
     // New states for branch actions
     @State private var showAddBranchSheet: Bool = false
@@ -243,6 +245,7 @@ struct RepoView: View {
                     Button("Push") {
                         showPush = true
                     }
+                    .disabled(!canPush)
                     Button("Commit Changes") {
                         
                     }
@@ -288,6 +291,7 @@ struct RepoView: View {
                 Button("Push") {
                     showPush = true
                 }
+                .disabled(!canPush)
                 .padding(.horizontal)
                 .buttonStyle(.borderedProminent)
             }
@@ -415,6 +419,10 @@ struct RepoView: View {
             DispatchQueue.global(qos: .userInitiated).async {
                 loadChangedFiles()
                 loadBranches()
+                // recompute push availability after we've loaded state
+                DispatchQueue.global(qos: .utility).async {
+                    updatePushAvailability()
+                }
             }
         }
         // When the push sheet is dismissed, refresh changed files & branches.
@@ -424,17 +432,39 @@ struct RepoView: View {
             }
         }
         // Debug: log when our sheet flags change so we can see whether presentation state flips
-        .onChange(of: showAddBranchSheet) { newValue in
-            print("showAddBranchSheet changed -> \(newValue)")
+        .onChange(of: showAddBranchSheet) { oldValue, newValue in
+            print("showAddBranchSheet changed -> \(newValue) (old=\(oldValue))")
             if newValue == false { refreshRepositoryState() }
         }
-        .onChange(of: showMergeSheet) { newValue in
-            print("showMergeSheet changed -> \(newValue)")
+        .onChange(of: showMergeSheet) { oldValue, newValue in
+            print("showMergeSheet changed -> \(newValue) (old=\(oldValue))")
             if newValue == false { refreshRepositoryState() }
         }
-        .onChange(of: showPRSheet) { newValue in
-            print("showPRSheet changed -> \(newValue)")
+        .onChange(of: showPRSheet) { oldValue, newValue in
+            print("showPRSheet changed -> \(newValue) (old=\(oldValue))")
             if newValue == false { refreshRepositoryState() }
+        }
+        .onChange(of: currentBranch) { old, new in
+            // Recompute push availability when the current branch changes
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
+            }
+        }
+        .onChange(of: branches) { old, new in
+            // Recompute push availability when branch list changes (may affect upstream/ahead checks)
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
+            }
+        }
+        .onChange(of: changedFiles) { oldFiles, newFiles in
+            // Immediately enable push if there are any changed files so UI responds instantly
+            DispatchQueue.main.async {
+                self.canPush = !newFiles.isEmpty
+            }
+            // Then reconcile more expensive checks in background
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
+            }
         }
     }
     
@@ -607,21 +637,8 @@ struct RepoView: View {
                 seen.insert(f)
                 return true
             }
-            
-            // reset selection if current selection is no longer present
-            if let sel = self.selectedFile, !self.changedFiles.contains(sel) {
-                self.selectedFile = nil
-                self.selectedFileDiff = ""
-            }
-            
-            // If nothing is selected but we have changed files, auto-select the first one
-            if self.selectedFile == nil, let first = self.changedFiles.first {
-                self.selectedFile = first
-                // load diff for the newly selected file
-                DispatchQueue.global(qos: .userInitiated).async {
-                    self.loadDiff(for: first)
-                }
-            }
+            // Ensure the Push button updates quickly when we discover local changes
+            self.canPush = !self.changedFiles.isEmpty
         }
     }
     
@@ -645,6 +662,10 @@ struct RepoView: View {
                 self.currentBranch = currentOut
             } else if self.branches.count > 0 {
                 self.currentBranch = self.branches[0]
+            }
+            // After we've set the current branch, reconcile push availability
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
             }
         }
     }
@@ -848,6 +869,57 @@ struct RepoView: View {
                 showAlert(title: "Push failed", message: "Failed to push branch \(currentBranch) to origin:\n\(pushRes.output)")
             }
             return false
+        }
+    }
+    
+    private func updatePushAvailability() {
+        // Fast path: if our UI already knows about changed files, enable push immediately
+        if !changedFiles.isEmpty {
+            DispatchQueue.main.async {
+                self.canPush = true
+                print("RepoView.updatePushAvailability: fast-path canPush=true (changedFiles non-empty)")
+            }
+            return
+        }
+        
+        // 1) Check for working-tree changes (staged, unstaged, untracked)
+        let statusCmd = "cd \(shellEscape(projectDirectory)) && git status --porcelain"
+        print("RepoView.updatePushAvailability: running: \(statusCmd)")
+        let statusRes = runCommand(statusCmd)
+        let hasWorkingChanges = !statusRes.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        
+        // 2) Check if upstream exists for current branch
+        let upstreamCheckCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
+        let upRes = runCommand(upstreamCheckCmd)
+        let upstreamMissing = upRes.status != 0
+        
+        // 3) If upstream exists, check ahead count using rev-list --left-right
+        var aheadCount = 0
+        if !upstreamMissing {
+            let revListCmd = "cd \(shellEscape(projectDirectory)) && git rev-list --count --left-right @{u}...HEAD"
+            print("RepoView.updatePushAvailability: running: \(revListCmd)")
+            let revRes = runCommand(revListCmd)
+            if revRes.status == 0 {
+                // Output is like: "<behind>\t<ahead>" or two numbers separated by whitespace
+                let trimmed = revRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                let parts = trimmed.components(separatedBy: CharacterSet.whitespacesAndNewlines).filter { !$0.isEmpty }
+                if parts.count >= 2, let ahead = Int(parts.last ?? "0") {
+                    aheadCount = ahead
+                } else if parts.count == 1, let single = Int(parts[0]) {
+                    // In some git versions it may return a single number (treat as ahead)
+                    aheadCount = single
+                }
+            } else {
+                print("RepoView.updatePushAvailability: rev-list failed: \(revRes.output)")
+            }
+        }
+        
+        // Decide push availability: allow push if working changes exist (so user can commit/push),
+        // or we have commits ahead, or there's no upstream so a push can set upstream.
+        let shouldEnable = hasWorkingChanges || aheadCount > 0 || upstreamMissing
+        DispatchQueue.main.async {
+            self.canPush = shouldEnable
+            print("RepoView.updatePushAvailability: canPush=\(self.canPush) (workingChanges=\(hasWorkingChanges) ahead=\(aheadCount) upstreamMissing=\(upstreamMissing))")
         }
     }
 }
