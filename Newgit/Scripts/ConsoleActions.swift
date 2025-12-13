@@ -59,44 +59,18 @@ func runCommand(_ command: String) -> (output: String, status: Int32) {
 
 @discardableResult
 func runGHCommand(_ args: [String], currentDirectory: String? = nil) -> (output: String, status: Int32) {
-    let task = Process()
-    // Run the Homebrew-installed gh binary directly so gh auth and config work correctly
-    task.launchPath = "/opt/homebrew/bin/gh"
-    task.arguments = args
-
-    if let cwd = currentDirectory {
-        task.currentDirectoryPath = cwd
+    // Build a shell-escaped argument list and call via the safer runCommand(...) helper.
+    func shellEscape(_ s: String) -> String {
+        return "'" + s.replacingOccurrences(of: "'", with: "'\\'\'") + "'"
     }
 
-    // Ensure PATH includes common locations so gh can find git and other tools when run from the app
-    var env = ProcessInfo.processInfo.environment
-    let defaultPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
-    let existingPATH = env["PATH"] ?? ""
-    // Prepend default paths if they're not already present
-    var paths = defaultPaths + existingPATH.split(separator: ":").map { String($0) }
-    // Deduplicate while preserving order
-    var seen = Set<String>()
-    paths = paths.filter { p in
-        if seen.contains(p) { return false }
-        seen.insert(p)
-        return true
-    }
-    env["PATH"] = paths.joined(separator: ":")
-    task.environment = env
-
-    let pipe = Pipe()
-    task.standardOutput = pipe
-    task.standardError = pipe
-
-    do {
-        try task.run()
-    } catch {
-        return ("Failed to launch gh: \(error.localizedDescription)", -1)
+    let escapedArgs = args.map { shellEscape($0) }.joined(separator: " ")
+    var cmd = "gh"
+    if !escapedArgs.isEmpty { cmd += " " + escapedArgs }
+    if let cwd = currentDirectory, !cwd.isEmpty {
+        let escapedCwd = shellEscape(cwd)
+        cmd = "cd \(escapedCwd) && \(cmd)"
     }
 
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    task.waitUntilExit()
-
-    let output = String(data: data, encoding: .utf8) ?? ""
-    return (output, task.terminationStatus)
+    return runCommand(cmd)
 }

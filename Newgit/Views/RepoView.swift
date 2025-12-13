@@ -28,6 +28,18 @@ struct RepoView: View {
     @State private var branches: [String] = []
     @State private var currentBranch: String = ""
 
+    // New states for branch actions
+    @State private var showAddBranchSheet: Bool = false
+    @State private var newBranchName: String = ""
+
+    @State private var showMergeSheet: Bool = false
+    @State private var mergeTargetBranch: String = ""
+
+    @State private var showPRSheet: Bool = false
+    @State private var prTitle: String = ""
+    @State private var prBody: String = ""
+    @State private var prBaseBranch: String = ""
+
     var body: some View {
         VStack {
             HStack {
@@ -191,54 +203,86 @@ struct RepoView: View {
                     if branches.isEmpty {
                         Button("No branches found") { }
                     }
-                }
-                 Menu("Actions") {
-                     Button("Pull") {
-                         performPull()
-                     }
-                     Button("Push") {
-                         showPush = true
-                     }
-                     Button("Commit Changes") {
-                         
-                     }
+                    Divider()
+                    Button("Add Branch...") {
+                        newBranchName = ""
+                        print("Branch menu: Add Branch tapped")
+                        print("NSApp windows: \(NSApp.windows.map { $0.title }) keyWindow: \(String(describing: NSApp.keyWindow)) mainWindow: \(String(describing: NSApp.mainWindow))")
+                        // slightly longer delay to ensure the NSMenu closes before sheet presentation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            print("Presenting AddBranch sheet now")
+                            showAddBranchSheet = true
+                        }
+                    }
+                    Button("Merge current into…") {
+                        // Default to first branch that's not the current one
+                        mergeTargetBranch = branches.first(where: { $0 != currentBranch }) ?? ""
+                        print("Branch menu: Merge tapped, target=\(mergeTargetBranch)")
+                        print("NSApp windows: \(NSApp.windows.map { $0.title }) keyWindow: \(String(describing: NSApp.keyWindow)) mainWindow: \(String(describing: NSApp.mainWindow))")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            print("Presenting Merge sheet now")
+                            showMergeSheet = true
+                        }
+                    }
+                    Button("Create Pull Request") {
+                        prTitle = ""
+                        prBody = ""
+                        prBaseBranch = branches.first(where: { $0 != currentBranch }) ?? (branches.first ?? "main")
+                        print("Branch menu: Create PR tapped, base=\(prBaseBranch)")
+                        print("NSApp windows: \(NSApp.windows.map { $0.title }) keyWindow: \(String(describing: NSApp.keyWindow)) mainWindow: \(String(describing: NSApp.mainWindow))")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            print("Presenting PR sheet now")
+                            showPRSheet = true
+                        }
+                    }
                  }
-                 Menu("Open") {
-                     Button("Open workspace in Finder") {
-                         let homeURL = URL(fileURLWithPath: projectDirectory)
-                         NSWorkspace.shared.activateFileViewerSelecting([homeURL])
-                     }
-                     Divider()
-                     Button("Open workspace in Xcode") {
-                         if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
-                             let config = NSWorkspace.OpenConfiguration()
-                             config.arguments = [projectDirectory]
-                             NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
-                         }
-                     }
-                     Button("Open workspace in Visual Studio Code") {
-                         let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
-                         let config = NSWorkspace.OpenConfiguration()
-                         config.arguments = [projectDirectory]
-                         NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
-                     }
-                     Divider()
-                     Button("Open directory in Terminal") {
-                         if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-                             let config = NSWorkspace.OpenConfiguration()
-                             config.arguments = [projectDirectory]
-                             NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
-                         } else {
-                             // Fallback URL scheme
-                             let url = URL(string: "terminal://\(projectDirectory)")!
-                             NSWorkspace.shared.open(url)
-                         }
-                     }
-                     Divider()
-                     Button("Open repository in GitHub") {
-                         openRepositoryInGitHub()
-                     }
-                 }
+                  Menu("Actions") {
+                      Button("Pull") {
+                          performPull()
+                      }
+                      Button("Push") {
+                          showPush = true
+                      }
+                      Button("Commit Changes") {
+                          
+                      }
+                  }
+                  Menu("Open") {
+                      Button("Open workspace in Finder") {
+                          let homeURL = URL(fileURLWithPath: projectDirectory)
+                          NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+                      }
+                      Divider()
+                      Button("Open workspace in Xcode") {
+                          if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                              let config = NSWorkspace.OpenConfiguration()
+                              config.arguments = [projectDirectory]
+                              NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                          }
+                      }
+                      Button("Open workspace in Visual Studio Code") {
+                          let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+                          let config = NSWorkspace.OpenConfiguration()
+                          config.arguments = [projectDirectory]
+                          NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
+                      }
+                      Divider()
+                      Button("Open directory in Terminal") {
+                          if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                              let config = NSWorkspace.OpenConfiguration()
+                              config.arguments = [projectDirectory]
+                              NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+                          } else {
+                              // Fallback URL scheme
+                              let url = URL(string: "terminal://\(projectDirectory)")!
+                              NSWorkspace.shared.open(url)
+                          }
+                      }
+                      Divider()
+                      Button("Open repository in GitHub") {
+                          openRepositoryInGitHub()
+                      }
+                  }
              }
              ToolbarItemGroup(placement: .primaryAction) {
                  Button("Push") {
@@ -261,16 +305,136 @@ struct RepoView: View {
                 refreshRepositoryState()
              })
          }
-         // Load the changed files when the view appears
+         // Add Branch sheet
+         .sheet(isPresented: $showAddBranchSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Create a new branch")
+                    .font(.headline)
+                TextField("Branch name", text: $newBranchName)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                HStack {
+                    Spacer()
+                    Button("Cancel") {
+                        showAddBranchSheet = false
+                    }
+                    Button("Create") {
+                        let name = newBranchName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !name.isEmpty else { return }
+                        showAddBranchSheet = false
+                        createBranch(name)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            }
+            .padding()
+            .frame(minWidth: 420, minHeight: 140)
+        }
+
+        // Merge sheet
+        .sheet(isPresented: $showMergeSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Merge current branch into…")
+                    .font(.headline)
+
+                if branches.filter({ $0 != currentBranch }).isEmpty {
+                    Text("No other branches available to merge into.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Picker("Target branch", selection: $mergeTargetBranch) {
+                        ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
+                            Text(b).tag(b)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                HStack {
+                    Spacer()
+                    Button("Cancel") {
+                        showMergeSheet = false
+                    }
+                    Button("Merge") {
+                        let target = mergeTargetBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !target.isEmpty else { return }
+                        showMergeSheet = false
+                        mergeCurrentInto(target)
+                    }
+                    .disabled(mergeTargetBranch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding()
+            .frame(minWidth: 480, minHeight: 160)
+        }
+
+        // Pull Request sheet
+        .sheet(isPresented: $showPRSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Create Pull Request")
+                    .font(.headline)
+
+                TextField("PR title", text: $prTitle)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                TextEditor(text: $prBody)
+                    .frame(height: 120)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.2)))
+
+                Picker("Base branch", selection: $prBaseBranch) {
+                    ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
+                        Text(b).tag(b)
+                    }
+                    // fallback
+                    ForEach(branches, id: \.self) { b in
+                        if branches.filter({ $0 != currentBranch }).isEmpty { Text(b).tag(b) }
+                    }
+                }
+                .pickerStyle(.menu)
+
+                HStack {
+                    Spacer()
+                    Button("Cancel") {
+                        showPRSheet = false
+                    }
+                    Button("Create PR") {
+                        let title = prTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let body = prBody.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let base = prBaseBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !title.isEmpty, !base.isEmpty else { return }
+                        showPRSheet = false
+                        createPullRequest(base: base, title: title, body: body)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(prTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || prBaseBranch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding()
+            .frame(minWidth: 520, minHeight: 320)
+        }
+         // Load the changed files when the view appears (do heavy work off the main thread so UI remains responsive)
          .onAppear {
-            loadChangedFiles()
-            loadBranches()
+            DispatchQueue.global(qos: .userInitiated).async {
+                loadChangedFiles()
+                loadBranches()
+            }
          }
         // When the push sheet is dismissed, refresh changed files & branches.
         .onChange(of: showPush) { oldValue, newValue in
             if newValue == false {
                 refreshRepositoryState()
             }
+        }
+        // Debug: log when our sheet flags change so we can see whether presentation state flips
+        .onChange(of: showAddBranchSheet) { newValue in
+            print("showAddBranchSheet changed -> \(newValue)")
+            if newValue == false { refreshRepositoryState() }
+        }
+        .onChange(of: showMergeSheet) { newValue in
+            print("showMergeSheet changed -> \(newValue)")
+            if newValue == false { refreshRepositoryState() }
+        }
+        .onChange(of: showPRSheet) { newValue in
+            print("showPRSheet changed -> \(newValue)")
+            if newValue == false { refreshRepositoryState() }
         }
      }
 
@@ -594,4 +758,58 @@ struct RepoView: View {
         }
     }
 
-}
+    // MARK: - Branch action helpers
+    private func createBranch(_ branch: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let cmd = "cd \(shellEscape(projectDirectory)) && git checkout -b \(shellEscape(branch))"
+            print("RepoView.createBranch: running: \(cmd)")
+            let res = runCommand(cmd)
+            print("RepoView.createBranch: exit=\(res.status) output=\(res.output)")
+            DispatchQueue.main.async {
+                if res.status == 0 {
+                    loadBranches()
+                    currentBranch = branch
+                    showAlert(title: "Branch created", message: "Created and checked out branch \(branch)")
+                } else {
+                    showAlert(title: "Create branch failed", message: res.output)
+                }
+            }
+        }
+    }
+
+    private func mergeCurrentInto(_ target: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Checkout the target and merge current branch into it
+            let cmd = "cd \(shellEscape(projectDirectory)) && git checkout \(shellEscape(target)) && git merge --no-ff \(shellEscape(currentBranch)) -m \"Merge branch '\(currentBranch)' into \(target)\""
+            print("RepoView.mergeCurrentInto: running: \(cmd)")
+            let res = runCommand(cmd)
+            print("RepoView.mergeCurrentInto: exit=\(res.status) output=\(res.output)")
+            DispatchQueue.main.async {
+                if res.status == 0 {
+                    loadBranches()
+                    loadChangedFiles()
+                    showAlert(title: "Merge succeeded", message: res.output.trimmingCharacters(in: .whitespacesAndNewlines))
+                } else {
+                    showAlert(title: "Merge failed", message: res.output)
+                }
+            }
+        }
+    }
+
+    private func createPullRequest(base: String, title: String, body: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let args = ["pr", "create", "--title", title, "--body", body, "--base", base, "--head", currentBranch]
+            print("RepoView.createPullRequest: running gh \(args)")
+            let res = runGHCommand(args, currentDirectory: projectDirectory)
+            print("RepoView.createPullRequest: exit=\(res.status) output=\(res.output)")
+            DispatchQueue.main.async {
+                if res.status == 0 {
+                    showAlert(title: "Pull request created", message: res.output.trimmingCharacters(in: .whitespacesAndNewlines))
+                } else {
+                    showAlert(title: "gh pr create failed", message: res.output)
+                }
+            }
+        }
+    }
+
+ }
