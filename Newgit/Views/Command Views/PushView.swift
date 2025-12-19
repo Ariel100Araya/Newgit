@@ -51,16 +51,30 @@ struct PushView: View {
                             performPush()
                             trigger += 1
                         }
-                    Button(action: {
-                        performPush()
-                        trigger += 1
-                    }) {
-                        Text(isProcessing ? "Working..." : "Push")
+                    
+                    if #available(macOS 26.0, *) {
+                        Button(action: {
+                            performPush()
+                            trigger += 1
+                        }) {
+                            Text(isProcessing ? "Working..." : "Push")
+                        }
+                        .glassEffect()
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isProcessing)
+                        .padding()
+                    } else {
+                        // Fallback on earlier versions
+                        Button(action: {
+                            performPush()
+                            trigger += 1
+                        }) {
+                            Text(isProcessing ? "Working..." : "Push")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isProcessing)
+                        .padding()
                     }
-                    .glassEffect()
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isProcessing)
-                    .padding()
                 }
                 .padding([.leading, .bottom, .trailing])
             }

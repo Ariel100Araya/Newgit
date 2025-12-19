@@ -56,48 +56,99 @@ struct RepoView: View {
                                 .bold()
                             // I should probably add some buttons for common actions here like Open in Finder, terminal, etc.
                             HStack {
-                                Menu("Open") {
-                                    Button("Open workspace in Finder") {
-                                        let homeURL = URL(fileURLWithPath: projectDirectory)
-                                        NSWorkspace.shared.activateFileViewerSelecting([homeURL])
-                                    }
-                                    Button("Open workspace in Xcode") {
-                                        if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                                if #available(macOS 26.0, *) {
+                                    Menu("Open") {
+                                        Button("Open workspace in Finder") {
+                                            let homeURL = URL(fileURLWithPath: projectDirectory)
+                                            NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+                                        }
+                                        Button("Open workspace in Xcode") {
+                                            if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                                                let config = NSWorkspace.OpenConfiguration()
+                                                config.arguments = [projectDirectory]
+                                                NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                                            }
+                                        }
+                                        Button("Open workspace in Visual Studio Code") {
+                                            let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
                                             let config = NSWorkspace.OpenConfiguration()
                                             config.arguments = [projectDirectory]
-                                            NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                                            NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
                                         }
                                     }
-                                    Button("Open workspace in Visual Studio Code") {
-                                        let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
-                                        let config = NSWorkspace.OpenConfiguration()
-                                        config.arguments = [projectDirectory]
-                                        NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
+                                    .padding()
+                                    .glassEffect()
+                                    .buttonStyle(.borderless)
+                                } else {
+                                    // Fallback on earlier versions
+                                    Menu("Open") {
+                                        Button("Open workspace in Finder") {
+                                            let homeURL = URL(fileURLWithPath: projectDirectory)
+                                            NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+                                        }
+                                        Button("Open workspace in Xcode") {
+                                            if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                                                let config = NSWorkspace.OpenConfiguration()
+                                                config.arguments = [projectDirectory]
+                                                NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                                            }
+                                        }
+                                        Button("Open workspace in Visual Studio Code") {
+                                            let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+                                            let config = NSWorkspace.OpenConfiguration()
+                                            config.arguments = [projectDirectory]
+                                            NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
+                                        }
                                     }
+                                    .padding()
+                                    .buttonStyle(.borderless)
                                 }
-                                .padding()
-                                .glassEffect()
-                                .buttonStyle(.borderless)
-                                Button("Open directory in Terminal") {
-                                    if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-                                        let config = NSWorkspace.OpenConfiguration()
-                                        config.arguments = [projectDirectory]
-                                        NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
-                                    } else {
-                                        // Fallback URL scheme
-                                        let url = URL(string: "terminal://\(projectDirectory)")!
-                                        NSWorkspace.shared.open(url)
+                                if #available(macOS 26.0, *) {
+                                    Button("Open directory in Terminal") {
+                                        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                                            let config = NSWorkspace.OpenConfiguration()
+                                            config.arguments = [projectDirectory]
+                                            NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+                                        } else {
+                                            // Fallback URL scheme
+                                            let url = URL(string: "terminal://\(projectDirectory)")!
+                                            NSWorkspace.shared.open(url)
+                                        }
                                     }
+                                    .padding()
+                                    .buttonStyle(.borderless)
+                                    .glassEffect()
+                                } else {
+                                    // Fallback on earlier versions
+                                    Button("Open directory in Terminal") {
+                                        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                                            let config = NSWorkspace.OpenConfiguration()
+                                            config.arguments = [projectDirectory]
+                                            NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+                                        } else {
+                                            // Fallback URL scheme
+                                            let url = URL(string: "terminal://\(projectDirectory)")!
+                                            NSWorkspace.shared.open(url)
+                                        }
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
                                 }
-                                .padding()
-                                .buttonStyle(.borderless)
-                                .glassEffect()
-                                Button("Open repository in GitHub") {
-                                    openRepositoryInGitHub()
+                                if #available(macOS 26.0, *) {
+                                    Button("Open repository in GitHub") {
+                                        openRepositoryInGitHub()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
+                                    .glassEffect()
+                                } else {
+                                    // Fallback on earlier versions
+                                    Button("Open repository in GitHub") {
+                                        openRepositoryInGitHub()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
                                 }
-                                .padding()
-                                .buttonStyle(.borderless)
-                                .glassEffect()
                             }
                         }
                     }

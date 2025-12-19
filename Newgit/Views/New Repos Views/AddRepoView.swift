@@ -24,11 +24,19 @@ struct AddRepoView: View {
             HStack {
                 TextField("Project Directory", text: $projectDirectory)
                     .frame(minWidth: 400)
-                Button("Browse") {
-                    browseForDirectory()
+                if #available(macOS 26.0, *) {
+                    Button("Browse") {
+                        browseForDirectory()
+                    }
+                    .glassEffect()
+                    .padding(.leading, 6)
+                } else {
+                    // Fallback on earlier versions
+                    Button("Browse") {
+                        browseForDirectory()
+                    }
+                    .padding(.leading, 6)
                 }
-                .glassEffect()
-                .padding(.leading, 6)
             }
             .padding(.bottom)
             Text("Enter a title")
@@ -37,38 +45,21 @@ struct AddRepoView: View {
                 projectTitle = sanitizeProjectNameForTyping(new)
             }))
             .padding(.bottom)
-            Button("Add Repository") {
-                // Validate inputs
-                let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                // Save-time sanitizer: trim leading/trailing hyphens
-                let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
-                let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
-                    saveMessage = "Please enter both a project title and directory."
-                    showSaveAlert = true
-                    return
+            if #available(macOS 26.0, *) {
+                Button("Add Repository") {
+                    addRepo()
                 }
-
-                let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
-                modelContext.insert(repo)
-                print("AddRepoView: inserted repo \(sanitizedTitle) id=\(repo.id)")
-                do {
-                    try modelContext.save()
-                    saveMessage = "Saved \(sanitizedTitle)"
-                    print("AddRepoView: modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
-                } catch {
-                    saveMessage = "Save failed: \(error.localizedDescription)"
-                    print("AddRepoView: modelContext.save() failed: \(error)")
+                .buttonStyle(.borderedProminent)
+                .glassEffect()
+                .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } else {
+                // Fallback on earlier versions
+                Button("Add Repository") {
+                    addRepo()
                 }
-                showSaveAlert = true
-                // Clear inputs after adding
-                projectTitle = ""
-                projectDirectory = ""
-                dismiss()
-             }
-             .buttonStyle(.borderedProminent)
-             .glassEffect()
-             .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .buttonStyle(.borderedProminent)
+                .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
          
             // Show the saved repos and allow deleting
             List {
@@ -146,7 +137,37 @@ struct AddRepoView: View {
         while out.hasSuffix("-") { out.removeLast() }
         return out
     }
-
+    
+    // Add Repo
+    private func addRepo() {
+        let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Save-time sanitizer: trim leading/trailing hyphens
+        let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
+        let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
+            saveMessage = "Please enter both a project title and directory."
+            showSaveAlert = true
+            return
+        }
+        
+        let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
+        modelContext.insert(repo)
+        print("AddRepoView: inserted repo \(sanitizedTitle) id=\(repo.id)")
+        do {
+            try modelContext.save()
+            saveMessage = "Saved \(sanitizedTitle)"
+            print("AddRepoView: modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
+        } catch {
+            saveMessage = "Save failed: \(error.localizedDescription)"
+            print("AddRepoView: modelContext.save() failed: \(error)")
+        }
+        showSaveAlert = true
+        // Clear inputs after adding
+        projectTitle = ""
+        projectDirectory = ""
+        dismiss()
+    }
+    
     // Browse for directory helper (macOS)
     private func browseForDirectory() {
         #if os(macOS)

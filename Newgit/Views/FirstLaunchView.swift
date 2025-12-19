@@ -104,24 +104,51 @@ struct FirstLaunchView: View {
                         // Action buttons: fade them in after the greeting using showWelcomeActions
                         if showWelcomeActions {
                             HStack {
-                                Button("Clone Repository") {
-                                    cloneRepo()
+                                if #available(macOS 26.0, *) {
+                                    Button("Clone Repository") {
+                                        cloneRepo()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
+                                    .glassEffect()
+                                } else {
+                                    // Fallback on earlier versions
+                                    Button("Clone Repository") {
+                                        cloneRepo()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
                                 }
-                                .padding()
-                                .buttonStyle(.borderless)
-                                .glassEffect()
-                                Button("Add existing Repository") {
-                                    addExistingRepo()
+                                if #available(macOS 26.0, *) {
+                                    Button("Add existing Repository") {
+                                        addExistingRepo()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
+                                    .glassEffect()
+                                } else {
+                                    // Fallback on earlier versions
+                                    Button("Add existing Repository") {
+                                        addExistingRepo()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
                                 }
-                                .padding()
-                                .buttonStyle(.borderless)
-                                .glassEffect()
-                                Button("Add new Repository") {
-                                    addNewRepo()
+                                if #available(macOS 26.0, *) {
+                                    Button("Add new Repository") {
+                                        addNewRepo()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
+                                    .glassEffect()
+                                } else {
+                                    // Fallback on earlier versions
+                                    Button("Add new Repository") {
+                                        addNewRepo()
+                                    }
+                                    .padding()
+                                    .buttonStyle(.borderless)
                                 }
-                                .padding()
-                                .buttonStyle(.borderless)
-                                .glassEffect()
                             }
                             .padding()
                             .transition(.opacity)

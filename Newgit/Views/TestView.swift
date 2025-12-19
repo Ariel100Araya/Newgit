@@ -25,36 +25,76 @@ struct TestView: View {
             TextField("Enter command", text: $commandInput)
                 .padding()
             HStack {
-                Text("Run Command in terminal")
-                    .onTapGesture {
-                        showCommandOutput = true
-                        isGHCommand = false
-                    }
-                    .padding()
-                    .glassEffect()
-                Text("Run Command in GH CLI")
-                    .onTapGesture {
-                        showCommandOutput = true
-                        isGHCommand = true
-                    }
-                    .padding()
-                    .glassEffect()
-                Text("Push")
-                    .onTapGesture {
-                        showCommandOutput = true
-                        gitPush = true
-                    }
-                    .padding()
-                    .glassEffect()
+                if #available(macOS 26.0, *) {
+                    Text("Run Command in terminal")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            isGHCommand = false
+                        }
+                        .padding()
+                        .glassEffect()
+                } else {
+                    // Fallback on earlier versions
+                    Text("Run Command in terminal")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            isGHCommand = false
+                        }
+                        .padding()
+                }
+                if #available(macOS 26.0, *) {
+                    Text("Run Command in GH CLI")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            isGHCommand = true
+                        }
+                        .padding()
+                        .glassEffect()
+                } else {
+                    // Fallback on earlier versions
+                    Text("Run Command in GH CLI")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            isGHCommand = true
+                        }
+                        .padding()
+                }
+                if #available(macOS 26.0, *) {
+                    Text("Push")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            gitPush = true
+                        }
+                        .padding()
+                        .glassEffect()
+                } else {
+                    // Fallback on earlier versions
+                    Text("Push")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            gitPush = true
+                        }
+                        .padding()
+                }
             }
             HStack {
-                Text("Sign into GitHub CLI")
-                    .onTapGesture {
-                        showCommandOutput = true
-                        isGHCommand = true
-                    }
-                    .padding()
-                    .glassEffect()
+                if #available(macOS 26.0, *) {
+                    Text("Sign into GitHub CLI")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            isGHCommand = true
+                        }
+                        .padding()
+                        .glassEffect()
+                } else {
+                    // Fallback on earlier versions
+                    Text("Sign into GitHub CLI")
+                        .onTapGesture {
+                            showCommandOutput = true
+                            isGHCommand = true
+                        }
+                        .padding()
+                }
             }
             Text("Command Output will appear here")
                 .padding()

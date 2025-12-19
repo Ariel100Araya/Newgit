@@ -28,11 +28,19 @@ struct AddNewRepoView: View {
             HStack {
                 TextField("Project Directory", text: $projectDirectory)
                     .frame(minWidth: 400)
-                Button("Browse") {
-                    browseForDirectory()
+                if #available(macOS 26.0, *) {
+                    Button("Browse") {
+                        browseForDirectory()
+                    }
+                    .glassEffect()
+                    .padding(.leading, 6)
+                } else {
+                    // Fallback on earlier versions
+                    Button("Browse") {
+                        browseForDirectory()
+                    }
+                    .padding(.leading, 6)
                 }
-                .glassEffect()
-                .padding(.leading, 6)
             }
             .padding(.bottom)
             Text("Enter a title")
