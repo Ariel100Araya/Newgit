@@ -3,9 +3,12 @@
 ### This app is in Beta! If you have any issue open an issue or just email me at ariel@prettycoolwebsite.com. 
 
 ## Hi there!
-Hi! My name is Ariel and this is Newgit (pronounced new git) if you find a better for this project, please let me know. 
+Hi! My name is Ariel and this is Newgit (pronounced new git) if you find a better name for this project, please let me know. 
 
 ![Welcome!](screenshots/s3.png)
+
+## Here to get the app?
+Press the releases tab on the right side and click on the latest!
 
 ## The idea
 Basically GitHub Desktop is based on Electron and although it works with multiple platforms it looks a little odd with the new design language of macOS, like a relic of the past of the days of macOS Yosemite. 
