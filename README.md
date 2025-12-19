@@ -21,7 +21,7 @@ It works by doing gh and git commands in your terminal. Using Swift's Process() 
 
 This app has the following requirements 
 
-macOS Tahoe 26.1
+macOS Sonoma 14.5 Minimum macOS Tahoe recommended
 HomeBrew package manager (https://brew.sh)
 GitHub CLI (https://cli.github.com)
 
