@@ -752,7 +752,32 @@ struct RepoView: View {
                 if res.status == 0 {
                     loadBranches()
                     currentBranch = branch
-                    showAlert(title: "Branch created", message: "Created and checked out branch \(branch)")
+                    
+                    // Ask the user whether they'd like to publish (push + set upstream) the new branch now.
+                    let alert = NSAlert()
+                    alert.messageText = "Branch created"
+                    alert.informativeText = "Created and checked out branch \(branch).\n\nPublish this branch to origin and set it as upstream now?"
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "Publish")
+                    alert.addButton(withTitle: "Later")
+                    
+                    if let window = NSApplication.shared.keyWindow {
+                        alert.beginSheetModal(for: window) { response in
+                            if response == .alertFirstButtonReturn {
+                                // User chose Publish: run push+set-upstream in background
+                                DispatchQueue.global(qos: .userInitiated).async {
+                                    _ = ensureUpstreamForCurrentBranch()
+                                }
+                            }
+                        }
+                    } else {
+                        let response = alert.runModal()
+                        if response == .alertFirstButtonReturn {
+                            DispatchQueue.global(qos: .userInitiated).async {
+                                _ = ensureUpstreamForCurrentBranch()
+                            }
+                        }
+                    }
                 } else {
                     showAlert(title: "Create branch failed", message: res.output)
                 }
