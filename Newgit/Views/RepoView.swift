@@ -805,7 +805,7 @@ struct RepoView: View {
     /// Returns true on success (upstream exists or was created), false otherwise.
     private func ensureUpstreamForCurrentBranch() -> Bool {
         // Check for an upstream tracking branch
-        let checkCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
+        let checkCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
         print("RepoView.ensureUpstream: running: \(checkCmd)")
         let checkRes = runCommand(checkCmd)
         if checkRes.status == 0 {
@@ -851,14 +851,14 @@ struct RepoView: View {
         let hasWorkingChanges = !statusRes.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         
         // 2) Check if upstream exists for current branch
-        let upstreamCheckCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
+        let upstreamCheckCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
         let upRes = runCommand(upstreamCheckCmd)
         let upstreamMissing = upRes.status != 0
         
         // 3) If upstream exists, check ahead count using rev-list --left-right
         var aheadCount = 0
         if !upstreamMissing {
-            let revListCmd = "cd \(shellEscape(projectDirectory)) && git rev-list --count --left-right @{u}...HEAD"
+            let revListCmd = "cd \(shellEscape(projectDirectory)) && git rev-list --count --left-right @{u}...HEAD 2>/dev/null"
             print("RepoView.updatePushAvailability: running: \(revListCmd)")
             let revRes = runCommand(revListCmd)
             if revRes.status == 0 {
