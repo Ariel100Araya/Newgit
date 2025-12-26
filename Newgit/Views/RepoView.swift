@@ -42,6 +42,12 @@ struct RepoView: View {
     @State private var prBody: String = ""
     @State private var prBaseBranch: String = ""
     
+    // Issue tracking state
+    @State private var showIssuesSheet: Bool = false
+    @State private var issues: [Issue] = []
+    @State private var isLoadingIssues: Bool = false
+    @State private var issuesError: String? = nil
+    
     var body: some View {
         VStack {
             HStack {
@@ -56,99 +62,10 @@ struct RepoView: View {
                                 .bold()
                             // I should probably add some buttons for common actions here like Open in Finder, terminal, etc.
                             HStack {
-                                if #available(macOS 26.0, *) {
-                                    Menu("Open") {
-                                        Button("Open workspace in Finder") {
-                                            let homeURL = URL(fileURLWithPath: projectDirectory)
-                                            NSWorkspace.shared.activateFileViewerSelecting([homeURL])
-                                        }
-                                        Button("Open workspace in Xcode") {
-                                            if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
-                                                let config = NSWorkspace.OpenConfiguration()
-                                                config.arguments = [projectDirectory]
-                                                NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
-                                            }
-                                        }
-                                        Button("Open workspace in Visual Studio Code") {
-                                            let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
-                                            let config = NSWorkspace.OpenConfiguration()
-                                            config.arguments = [projectDirectory]
-                                            NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
-                                        }
-                                    }
-                                    .padding()
-                                    .glassEffect()
-                                    .buttonStyle(.borderless)
-                                } else {
-                                    // Fallback on earlier versions
-                                    Menu("Open") {
-                                        Button("Open workspace in Finder") {
-                                            let homeURL = URL(fileURLWithPath: projectDirectory)
-                                            NSWorkspace.shared.activateFileViewerSelecting([homeURL])
-                                        }
-                                        Button("Open workspace in Xcode") {
-                                            if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
-                                                let config = NSWorkspace.OpenConfiguration()
-                                                config.arguments = [projectDirectory]
-                                                NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
-                                            }
-                                        }
-                                        Button("Open workspace in Visual Studio Code") {
-                                            let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
-                                            let config = NSWorkspace.OpenConfiguration()
-                                            config.arguments = [projectDirectory]
-                                            NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
-                                        }
-                                    }
-                                    .padding()
-                                    .buttonStyle(.borderless)
-                                }
-                                if #available(macOS 26.0, *) {
-                                    Button("Open directory in Terminal") {
-                                        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-                                            let config = NSWorkspace.OpenConfiguration()
-                                            config.arguments = [projectDirectory]
-                                            NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
-                                        } else {
-                                            // Fallback URL scheme
-                                            let url = URL(string: "terminal://\(projectDirectory)")!
-                                            NSWorkspace.shared.open(url)
-                                        }
-                                    }
-                                    .padding()
-                                    .buttonStyle(.borderless)
-                                    .glassEffect()
-                                } else {
-                                    // Fallback on earlier versions
-                                    Button("Open directory in Terminal") {
-                                        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-                                            let config = NSWorkspace.OpenConfiguration()
-                                            config.arguments = [projectDirectory]
-                                            NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
-                                        } else {
-                                            // Fallback URL scheme
-                                            let url = URL(string: "terminal://\(projectDirectory)")!
-                                            NSWorkspace.shared.open(url)
-                                        }
-                                    }
-                                    .padding()
-                                    .buttonStyle(.borderless)
-                                }
-                                if #available(macOS 26.0, *) {
-                                    Button("Open repository in GitHub") {
-                                        openRepositoryInGitHub()
-                                    }
-                                    .padding()
-                                    .buttonStyle(.borderless)
-                                    .glassEffect()
-                                } else {
-                                    // Fallback on earlier versions
-                                    Button("Open repository in GitHub") {
-                                        openRepositoryInGitHub()
-                                    }
-                                    .padding()
-                                    .buttonStyle(.borderless)
-                                }
+                                // Simplified: delegate heavy view-building to small helper functions to avoid compiler timeouts
+                                openMenuView()
+                                openTerminalButton()
+                                openRepoButton()
                             }
                         }
                     }
@@ -297,8 +214,14 @@ struct RepoView: View {
                         showPush = true
                     }
                     .disabled(!canPush)
-                    Button("Commit Changes") {
-                        
+                    Divider()
+                    Button("Show issues") {
+                        // Prepare and present the issues sheet, then fetch issues in background
+                        issues = []
+                        issuesError = nil
+                        isLoadingIssues = true
+                        showIssuesSheet = true
+                        DispatchQueue.global(qos: .userInitiated).async { loadIssues() }
                     }
                 }
                 Menu("Open") {
@@ -464,6 +387,50 @@ struct RepoView: View {
             }
             .padding()
             .frame(minWidth: 520, minHeight: 320)
+        }
+        // Issues sheet
+        .sheet(isPresented: $showIssuesSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Issues")
+                    .font(.headline)
+                
+                if isLoadingIssues {
+                    ProgressView("Loading issues...")
+                        .padding()
+                } else if let error = issuesError {
+                    Text("Error loading issues: \(error)")
+                        .foregroundColor(.red)
+                        .padding()
+                } else if issues.isEmpty {
+                    Text("No issues found.")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    List(issues) { issue in
+                        VStack(alignment: .leading) {
+                            Text("#\(issue.number): \(issue.title)")
+                                .font(.headline)
+                            Text(issue.state.capitalized)
+                                .font(.subheadline)
+                                .foregroundColor(issue.state == "open" ? .green : .red)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listStyle(.plain)
+                    .frame(minWidth: 400, minHeight: 200)
+                }
+                
+                HStack {
+                    Spacer()
+                    Button("Close") {
+                        showIssuesSheet = false
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+                .padding(.top)
+            }
+            .padding()
+            .frame(minWidth: 480, minHeight: 300)
         }
         // Load the changed files when the view appears (do heavy work off the main thread so UI remains responsive)
         .onAppear {
@@ -841,7 +808,12 @@ struct RepoView: View {
                 if res.status == 0 {
                     loadBranches()
                     currentBranch = branch
-                    showAlert(title: "Branch created", message: "Created and checked out branch \(branch)")
+                    
+                    // Automatically publish the created branch (push + set upstream) in background.
+                    // ensureUpstreamForCurrentBranch will show success/failure alerts as needed.
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        _ = ensureUpstreamForCurrentBranch()
+                    }
                 } else {
                     showAlert(title: "Create branch failed", message: res.output)
                 }
@@ -894,7 +866,7 @@ struct RepoView: View {
     /// Returns true on success (upstream exists or was created), false otherwise.
     private func ensureUpstreamForCurrentBranch() -> Bool {
         // Check for an upstream tracking branch
-        let checkCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
+        let checkCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
         print("RepoView.ensureUpstream: running: \(checkCmd)")
         let checkRes = runCommand(checkCmd)
         if checkRes.status == 0 {
@@ -940,14 +912,14 @@ struct RepoView: View {
         let hasWorkingChanges = !statusRes.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         
         // 2) Check if upstream exists for current branch
-        let upstreamCheckCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u}"
+        let upstreamCheckCmd = "cd \(shellEscape(projectDirectory)) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
         let upRes = runCommand(upstreamCheckCmd)
         let upstreamMissing = upRes.status != 0
         
         // 3) If upstream exists, check ahead count using rev-list --left-right
         var aheadCount = 0
         if !upstreamMissing {
-            let revListCmd = "cd \(shellEscape(projectDirectory)) && git rev-list --count --left-right @{u}...HEAD"
+            let revListCmd = "cd \(shellEscape(projectDirectory)) && git rev-list --count --left-right @{u}...HEAD 2>/dev/null"
             print("RepoView.updatePushAvailability: running: \(revListCmd)")
             let revRes = runCommand(revListCmd)
             if revRes.status == 0 {
@@ -973,4 +945,164 @@ struct RepoView: View {
             print("RepoView.updatePushAvailability: canPush=\(self.canPush) (workingChanges=\(hasWorkingChanges) ahead=\(aheadCount) upstreamMissing=\(upstreamMissing))")
         }
     }
+    
+    // MARK: - Small view helpers to reduce expression complexity
+    private func openMenuView() -> some View {
+        Group {
+            if #available(macOS 26.0, *) {
+                Menu("Open") {
+                    Button("Open workspace in Finder") {
+                        let homeURL = URL(fileURLWithPath: projectDirectory)
+                        NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+                    }
+                    Button("Open workspace in Xcode") {
+                        if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                            let config = NSWorkspace.OpenConfiguration()
+                            config.arguments = [projectDirectory]
+                            NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                        }
+                    }
+                    Button("Open workspace in Visual Studio Code") {
+                        let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+                        let config = NSWorkspace.OpenConfiguration()
+                        config.arguments = [projectDirectory]
+                        NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
+                    }
+                }
+                .padding()
+                .glassEffect()
+                .buttonStyle(.borderless)
+            } else {
+                Menu("Open") {
+                    Button("Open workspace in Finder") {
+                        let homeURL = URL(fileURLWithPath: projectDirectory)
+                        NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+                    }
+                    Button("Open workspace in Xcode") {
+                        if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                            let config = NSWorkspace.OpenConfiguration()
+                            config.arguments = [projectDirectory]
+                            NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                        }
+                    }
+                    Button("Open workspace in Visual Studio Code") {
+                        let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+                        let config = NSWorkspace.OpenConfiguration()
+                        config.arguments = [projectDirectory]
+                        NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
+                    }
+                }
+                .padding()
+                .buttonStyle(.borderless)
+            }
+        }
+    }
+    
+    private func openTerminalButton() -> some View {
+        Group {
+            if #available(macOS 26.0, *) {
+                Button("Open directory in Terminal") {
+                    if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                        let config = NSWorkspace.OpenConfiguration()
+                        config.arguments = [projectDirectory]
+                        NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+                    } else {
+                        let url = URL(string: "terminal://\(projectDirectory)")!
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .padding()
+                .buttonStyle(.borderless)
+                .glassEffect()
+            } else {
+                Button("Open directory in Terminal") {
+                    if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                        let config = NSWorkspace.OpenConfiguration()
+                        config.arguments = [projectDirectory]
+                        NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+                    } else {
+                        let url = URL(string: "terminal://\(projectDirectory)")!
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .padding()
+                .buttonStyle(.borderless)
+            }
+        }
+    }
+    
+    private func openRepoButton() -> some View {
+        Group {
+            if #available(macOS 26.0, *) {
+                Button("Open repository in GitHub") {
+                    openRepositoryInGitHub()
+                }
+                .padding()
+                .buttonStyle(.borderless)
+                .glassEffect()
+            } else {
+                Button("Open repository in GitHub") {
+                    openRepositoryInGitHub()
+                }
+                .padding()
+                .buttonStyle(.borderless)
+            }
+        }
+    }
+    
+    // Load GitHub issues for this repository using the `gh` CLI via runGHCommand.
+    private func loadIssues() {
+        let args = ["issue", "list", "--json", "number,title,state,url", "--limit", "100"]
+        print("RepoView.loadIssues: running gh \(args) in \(projectDirectory)")
+        let res = runGHCommand(args, currentDirectory: projectDirectory)
+        let raw = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("RepoView.loadIssues: exit=\(res.status) outputLength=\(raw.count)")
+        
+        DispatchQueue.main.async {
+            self.isLoadingIssues = false
+            if res.status != 0 {
+                self.issues = []
+                self.issuesError = raw.isEmpty ? "gh returned an error (exit \(res.status)). Ensure gh is installed and authenticated." : raw
+                return
+            }
+            
+            guard let data = raw.data(using: .utf8) else {
+                self.issues = []
+                self.issuesError = "Failed to decode gh output"
+                return
+            }
+            
+            do {
+                if let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    var mapped: [Issue] = []
+                    for obj in arr {
+                        guard let number = obj["number"] as? Int else { continue }
+                        let title = (obj["title"] as? String) ?? "(no title)"
+                        let state = (obj["state"] as? String ?? "").lowercased()
+                        let url = (obj["url"] as? String) ?? (obj["url"] as? String) ?? ""
+                        mapped.append(Issue(number: number, title: title, state: state, url: url))
+                    }
+                    self.issues = mapped
+                    self.issuesError = nil
+                } else {
+                    self.issues = []
+                    self.issuesError = "Failed to parse gh output"
+                }
+            } catch {
+                self.issues = []
+                self.issuesError = "Failed to parse gh output: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+struct Issue: Identifiable {
+    let number: Int
+    let title: String
+    let state: String
+    let url: String
+    // Provide a default so callers that only pass url continue to compile
+    let webUrl: String? = nil
+
+    var id: Int { number }
 }
