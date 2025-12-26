@@ -42,6 +42,12 @@ struct RepoView: View {
     @State private var prBody: String = ""
     @State private var prBaseBranch: String = ""
     
+    // Issue tracking state
+    @State private var showIssuesSheet: Bool = false
+    @State private var issues: [Issue] = []
+    @State private var isLoadingIssues: Bool = false
+    @State private var issuesError: String? = nil
+    
     var body: some View {
         VStack {
             HStack {
@@ -208,8 +214,14 @@ struct RepoView: View {
                         showPush = true
                     }
                     .disabled(!canPush)
-                    Button("Commit Changes") {
-                        
+                    Divider()
+                    Button("Show issues") {
+                        // Prepare and present the issues sheet, then fetch issues in background
+                        issues = []
+                        issuesError = nil
+                        isLoadingIssues = true
+                        showIssuesSheet = true
+                        DispatchQueue.global(qos: .userInitiated).async { loadIssues() }
                     }
                 }
                 Menu("Open") {
@@ -375,6 +387,50 @@ struct RepoView: View {
             }
             .padding()
             .frame(minWidth: 520, minHeight: 320)
+        }
+        // Issues sheet
+        .sheet(isPresented: $showIssuesSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Issues")
+                    .font(.headline)
+                
+                if isLoadingIssues {
+                    ProgressView("Loading issues...")
+                        .padding()
+                } else if let error = issuesError {
+                    Text("Error loading issues: \(error)")
+                        .foregroundColor(.red)
+                        .padding()
+                } else if issues.isEmpty {
+                    Text("No issues found.")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    List(issues) { issue in
+                        VStack(alignment: .leading) {
+                            Text("#\(issue.number): \(issue.title)")
+                                .font(.headline)
+                            Text(issue.state.capitalized)
+                                .font(.subheadline)
+                                .foregroundColor(issue.state == "open" ? .green : .red)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listStyle(.plain)
+                    .frame(minWidth: 400, minHeight: 200)
+                }
+                
+                HStack {
+                    Spacer()
+                    Button("Close") {
+                        showIssuesSheet = false
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+                .padding(.top)
+            }
+            .padding()
+            .frame(minWidth: 480, minHeight: 300)
         }
         // Load the changed files when the view appears (do heavy work off the main thread so UI remains responsive)
         .onAppear {
@@ -993,4 +1049,60 @@ struct RepoView: View {
             }
         }
     }
+    
+    // Load GitHub issues for this repository using the `gh` CLI via runGHCommand.
+    private func loadIssues() {
+        let args = ["issue", "list", "--json", "number,title,state,url", "--limit", "100"]
+        print("RepoView.loadIssues: running gh \(args) in \(projectDirectory)")
+        let res = runGHCommand(args, currentDirectory: projectDirectory)
+        let raw = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("RepoView.loadIssues: exit=\(res.status) outputLength=\(raw.count)")
+        
+        DispatchQueue.main.async {
+            self.isLoadingIssues = false
+            if res.status != 0 {
+                self.issues = []
+                self.issuesError = raw.isEmpty ? "gh returned an error (exit \(res.status)). Ensure gh is installed and authenticated." : raw
+                return
+            }
+            
+            guard let data = raw.data(using: .utf8) else {
+                self.issues = []
+                self.issuesError = "Failed to decode gh output"
+                return
+            }
+            
+            do {
+                if let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    var mapped: [Issue] = []
+                    for obj in arr {
+                        guard let number = obj["number"] as? Int else { continue }
+                        let title = (obj["title"] as? String) ?? "(no title)"
+                        let state = (obj["state"] as? String ?? "").lowercased()
+                        let url = (obj["url"] as? String) ?? (obj["url"] as? String) ?? ""
+                        mapped.append(Issue(number: number, title: title, state: state, url: url))
+                    }
+                    self.issues = mapped
+                    self.issuesError = nil
+                } else {
+                    self.issues = []
+                    self.issuesError = "Failed to parse gh output"
+                }
+            } catch {
+                self.issues = []
+                self.issuesError = "Failed to parse gh output: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+struct Issue: Identifiable {
+    let number: Int
+    let title: String
+    let state: String
+    let url: String
+    // Provide a default so callers that only pass url continue to compile
+    let webUrl: String? = nil
+
+    var id: Int { number }
 }
