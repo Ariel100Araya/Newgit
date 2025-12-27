@@ -42,18 +42,16 @@ struct RepoView: View {
     @State private var prBody: String = ""
     @State private var prBaseBranch: String = ""
     
-    @State private var showReleaseSheet: Bool = false
-    
     // Navigation state for the Issues screen
     @State private var showIssuesLink: Bool = false
+    // Navigation state for the Pull Requests screen
+    @State private var showPullRequestsLink: Bool = false
+    // Navigation state for the Add Release screen
+    @State private var showReleaseLink: Bool = false
     
     var body: some View {
         // Use a NavigationStack so we can push the IssuesView onto the navigation stack instead of presenting a sheet
         NavigationStack {
-            // Hidden NavigationLink activated by the toolbar button
-            NavigationLink(destination: IssuesView(projectDirectory: projectDirectory), isActive: $showIssuesLink) { EmptyView() }
-                .hidden()
-            
             VStack {
                 HStack {
                     // Left pane: selectable list of changed files
@@ -215,13 +213,19 @@ struct RepoView: View {
                         Button("Pull") { performPull() }
                         Button("Push") { showPush = true }
                             .disabled(!canPush)
-                        Button("Create Release") {
-                            showReleaseSheet = true
-                        }
                         Divider()
                         Button("Show issues") {
                             // Navigate to the Issues view (it will fetch its own data on appear)
                             showIssuesLink = true
+                        }
+                        Button("Show Pull Requests") {
+                            // Navigate to the PullRequestsView
+                            showPullRequestsLink = true
+                        }
+                        Divider()
+                        Button("Add New Release") {
+                            // Push the ReleaseView onto the NavigationStack
+                            showReleaseLink = true
                         }
                     }
                     Menu("Open") {
@@ -270,6 +274,9 @@ struct RepoView: View {
                     .buttonStyle(.borderedProminent)
                 }
             }
+            // Add state for Pull Requests navigation
+            // Pull Requests view is now integrated into the RepoView navigation stack
+            
             .sheet(isPresented: $showPush) {
                 PushView(projectDirectory: projectDirectory, onSuccess: {
                     // Optimistically clear the local changed-files UI so the user sees updated state immediately.
@@ -282,9 +289,6 @@ struct RepoView: View {
                     // Also kick off a more robust refresh sequence to reconcile with git on disk.
                     refreshRepositoryState()
                 })
-            }
-            .sheet(isPresented: $showReleaseSheet, onDismiss: { refreshRepositoryState() }) {
-                ReleaseView(projectDirectory: projectDirectory)
             }
             // Add Branch sheet
             .sheet(isPresented: $showAddBranchSheet) {
@@ -392,6 +396,15 @@ struct RepoView: View {
                 .frame(minWidth: 520, minHeight: 320)
             }
             // Load the changed files when the view appears (do heavy work off the main thread so UI remains responsive)
+            .navigationDestination(isPresented: $showIssuesLink) {
+                IssuesView(projectDirectory: projectDirectory)
+            }
+            .navigationDestination(isPresented: $showPullRequestsLink) {
+                PullRequestsView(projectDirectory: projectDirectory)
+            }
+            .navigationDestination(isPresented: $showReleaseLink) {
+                ReleaseView(projectDirectory: projectDirectory)
+            }
             .onAppear {
                 DispatchQueue.global(qos: .userInitiated).async {
                     loadChangedFiles()

@@ -54,10 +54,6 @@ struct ReleaseView: View {
             } else {
                 // Regular form
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Create GitHub Release")
-                        .font(.title2)
-                        .bold()
-
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Tag (e.g. v1.0.0)", text: $tag)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -69,10 +65,21 @@ struct ReleaseView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         TextEditor(text: $notes)
-                            .frame(height: 120)
+                            .frame(height: 50)
                             .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.2)))
                     }
-
+                    .navigationTitle("Create GitHub Release")
+                    .toolbar {
+                        ToolbarItemGroup(placement: .automatic) {
+                            // Toggle show closed/all issues
+                            Button(action: { createRelease() }) {
+                                Text(isCreating ? "Creating…" : "Create Release")
+                            }
+                            .disabled(isCreating || tag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .keyboardShortcut(.defaultAction)
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
                     // Drag & drop area
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Assets")
@@ -81,7 +88,7 @@ struct ReleaseView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .strokeBorder(Color.gray.opacity(0.3), lineWidth: 2)
                                 .background(Color(NSColor.windowBackgroundColor))
-                                .frame(minHeight: 140)
+                                .frame(minHeight: 60)
 
                             VStack {
                                 if selectedFiles.isEmpty {
@@ -131,17 +138,6 @@ struct ReleaseView: View {
                             handleDrop(providers)
                         }
                     }
-
-                    HStack {
-                        Spacer()
-                        Button("Cancel") { dismiss() }
-                        Button(action: { createRelease() }) {
-                            Text(isCreating ? "Creating…" : "Create Release")
-                        }
-                        .disabled(isCreating || tag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .keyboardShortcut(.defaultAction)
-                    }
-
                     if showOutput {
                         Divider()
                         VStack(alignment: .leading) {
@@ -177,7 +173,7 @@ struct ReleaseView: View {
         .alert(isPresented: $showErrorAlert) {
             Alert(title: Text("Release Failed"), message: Text(errorSummary), dismissButton: .default(Text("OK")))
         }
-        .frame(minWidth: 600, minHeight: 520)
+        .frame(minWidth: 600, minHeight: 50)
     }
 
     // MARK: - File helpers
