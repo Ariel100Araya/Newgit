@@ -7,6 +7,9 @@
 
 import SwiftUI
 import ConfettiSwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct PushView: View {
     @State private var commandInput: String = ""
@@ -22,6 +25,9 @@ struct PushView: View {
     @State private var commandOutput: String = ""
     @State private var isProcessing: Bool = false
     @State private var trigger: Int = 0
+    // Error feedback states
+    @State private var showErrorAlert: Bool = false
+    @State private var errorSummary: String = ""
     var body: some View {
         VStack (alignment: .leading) {
             // MARK: if succeded, have a 5 second success view
@@ -78,6 +84,46 @@ struct PushView: View {
                 }
                 .padding([.leading, .bottom, .trailing])
             }
+            
+            // Show command output / details when available
+            if showCommandOutput {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Command output")
+                            .font(.headline)
+                        Spacer()
+                        Button("Copy") {
+                            #if os(macOS)
+                            let pb = NSPasteboard.general
+                            pb.clearContents()
+                            pb.setString(commandOutput, forType: .string)
+                            #endif
+                        }
+                        .padding(.horizontal, 4)
+                    }
+                    .padding([.top, .horizontal])
+                    
+                    ScrollView {
+                        Text(commandOutput)
+                            .font(.system(.body, design: .monospaced))
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 180, maxHeight: 360)
+                    .background(Color(.windowBackgroundColor))
+                    .cornerRadius(8)
+                    .padding([.leading, .bottom, .trailing])
+                }
+            }
+        }
+        .alert(isPresented: $showErrorAlert) {
+            Alert(title: Text("Push Failed"),
+                  message: Text(errorSummary),
+                  primaryButton: .default(Text("OK")),
+                  secondaryButton: .default(Text("View Details"), action: {
+                    // Show details in the command output area
+                    showCommandOutput = true
+                  }))
         }
     }
 
@@ -104,8 +150,12 @@ struct PushView: View {
             let addRes = runCommand(addCmd)
             combined += "$ \(addCmd)\n" + addRes.output + "\nexit=\(addRes.status)\n\n"
             if addRes.status != 0 {
+                // Provide a short error summary and offer details
+                let short = addRes.output.split(separator: "\n").first.map(String.init) ?? "git add failed"
                 DispatchQueue.main.async {
                     self.commandOutput = combined
+                    self.errorSummary = "git add failed: \(short)"
+                    self.showErrorAlert = true
                     self.isProcessing = false
                     self.showSuccessView = false
                 }
@@ -126,8 +176,11 @@ struct PushView: View {
                     shouldAttemptPushDespiteCommitFailure = true
                 }
                 if !shouldAttemptPushDespiteCommitFailure {
+                    let short = commitRes.output.split(separator: "\n").first.map(String.init) ?? "git commit failed"
                     DispatchQueue.main.async {
                         self.commandOutput = combined
+                        self.errorSummary = "git commit failed: \(short)"
+                        self.showErrorAlert = true
                         self.isProcessing = false
                         self.showSuccessView = false
                     }
@@ -157,7 +210,11 @@ struct PushView: View {
                         self.dismiss()
                     }
                 } else {
-                    // Keep showing command output; don't show success
+                    // Show an error alert with a short summary and allow viewing full details
+                    let short = pushRes.output.split(separator: "\n").first.map(String.init) ?? "git push failed (exit=\(pushRes.status))"
+                    self.errorSummary = "git push failed: \(short)"
+                    self.showErrorAlert = true
+                    // Keep showing command output for details
                     self.showSuccessView = false
                 }
             }
