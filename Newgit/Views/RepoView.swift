@@ -42,6 +42,8 @@ struct RepoView: View {
     @State private var prBody: String = ""
     @State private var prBaseBranch: String = ""
     
+    @State private var showReleaseSheet: Bool = false
+    
     // Navigation state for the Issues screen
     @State private var showIssuesLink: Bool = false
     
@@ -213,6 +215,9 @@ struct RepoView: View {
                         Button("Pull") { performPull() }
                         Button("Push") { showPush = true }
                             .disabled(!canPush)
+                        Button("Create Release") {
+                            showReleaseSheet = true
+                        }
                         Divider()
                         Button("Show issues") {
                             // Navigate to the Issues view (it will fetch its own data on appear)
@@ -277,6 +282,9 @@ struct RepoView: View {
                     // Also kick off a more robust refresh sequence to reconcile with git on disk.
                     refreshRepositoryState()
                 })
+            }
+            .sheet(isPresented: $showReleaseSheet, onDismiss: { refreshRepositoryState() }) {
+                ReleaseView(projectDirectory: projectDirectory)
             }
             // Add Branch sheet
             .sheet(isPresented: $showAddBranchSheet) {
@@ -1002,4 +1010,3 @@ struct RepoView: View {
         }
     }
 }
-
