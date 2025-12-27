@@ -64,19 +64,6 @@ struct PullRequestsView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh PR list")
-
-                // Actions: Merge/Close based on selection
-                Button(action: {
-                    guard let p = selectedPR else { return }
-                    if p.state == "open" {
-                        mergePR(p)
-                    } else {
-                        closePR(p)
-                    }
-                }) {
-                    Image(systemName: selectedPR?.state == "open" ? "hammer" : "xmark")
-                }
-                .disabled(selectedPR == nil)
             }
         }
     }
