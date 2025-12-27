@@ -139,23 +139,6 @@ struct IssueDetailView: View {
                         }
                     }
                     .padding(.top)
-
-                    // Actions: add, close/reopen
-                    HStack {
-                        Button(action: onAdd) {
-                            Label("Add", systemImage: "plus")
-                        }
-                        .keyboardShortcut("N", modifiers: [.command])
-
-                        Spacer()
-
-                        Button(sel.state == "open" ? "Mark as done" : "Reopen") {
-                            if sel.state == "open" { onClose(sel) } else { onReopen(sel) }
-                        }
-                        .keyboardShortcut(.defaultAction)
-                    }
-                    .padding(.top)
-
                 } else {
                     Text("Select an issue to view details and manage it.")
                         .foregroundColor(.secondary)

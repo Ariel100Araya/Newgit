@@ -50,6 +50,7 @@ struct RepoView: View {
         NavigationStack {
             // Hidden NavigationLink activated by the toolbar button
             NavigationLink(destination: IssuesView(projectDirectory: projectDirectory), isActive: $showIssuesLink) { EmptyView() }
+                .hidden()
             
             VStack {
                 HStack {
