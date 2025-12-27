@@ -18,6 +18,14 @@ struct AddRepoView: View {
     @Query private var savedRepos: [SavedRepo]
     @State private var showSaveAlert: Bool = false
     @State private var saveMessage: String = ""
+
+    // New states for git/init flow
+    @State private var showInitConfirm: Bool = false
+    @State private var showGitMissingAlert: Bool = false
+    @State private var gitMissingMessage: String = ""
+    @State private var pendingInitPath: String = ""
+    @State private var pendingInitTitle: String = ""
+
     var body: some View {
         VStack(alignment: .leading) {
             Text("Enter a project directory")
@@ -86,41 +94,32 @@ struct AddRepoView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Add Repository") {
-                    // Validate inputs
-                    let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Save-time sanitizer: trim leading/trailing hyphens
-                    let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
-                    let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
-                        saveMessage = "Please enter both a project title and directory."
-                        showSaveAlert = true
-                        return
-                    }
-
-                    let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
-                    modelContext.insert(repo)
-                    print("AddRepoView(toolbar): inserted repo \(sanitizedTitle) id=\(repo.id)")
-                    do {
-                        try modelContext.save()
-                        saveMessage = "Saved \(sanitizedTitle)"
-                        print("AddRepoView(toolbar): modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
-                    } catch {
-                        saveMessage = "Save failed: \(error.localizedDescription)"
-                        print("AddRepoView(toolbar): modelContext.save() failed: \(error)")
-                    }
-                    showSaveAlert = true
-                    // Clear inputs after adding
-                    projectTitle = ""
-                    projectDirectory = ""
-                 }
-                 .padding(.horizontal)
-                 .buttonStyle(.borderedProminent)
-                 .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-             }
-         }
+                    // Use the same validated code path as the main Add button
+                    addRepo()
+                }
+                .padding(.horizontal)
+                .buttonStyle(.borderedProminent)
+                .disabled(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        // Generic save/failure alert
         .alert(saveMessage, isPresented: $showSaveAlert) {
-             Button("OK", role: .cancel) {}
-          }
+            Button("OK", role: .cancel) {}
+        }
+        // Alert when git is missing
+        .alert(gitMissingMessage, isPresented: $showGitMissingAlert) {
+            Button("OK", role: .cancel) {}
+        }
+        // Confirmation to initialize a repo when directory is not a git repo
+        .alert("Initialize repository?", isPresented: $showInitConfirm) {
+            Button("Initialize Repository") {
+                // Perform initialization and save
+                initializeRepo(path: pendingInitPath, title: pendingInitTitle)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This folder is not a git repository. Would you like to initialize a new git repository here?")
+        }
     }
     
     // Typing sanitizer: replace runs of whitespace with a single hyphen (keeps leading/trailing hyphens so space key yields '-')
@@ -149,25 +148,83 @@ struct AddRepoView: View {
             showSaveAlert = true
             return
         }
-        
-        let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
-        modelContext.insert(repo)
-        print("AddRepoView: inserted repo \(sanitizedTitle) id=\(repo.id)")
-        do {
-            try modelContext.save()
-            saveMessage = "Saved \(sanitizedTitle)"
-            print("AddRepoView: modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
-        } catch {
-            saveMessage = "Save failed: \(error.localizedDescription)"
-            print("AddRepoView: modelContext.save() failed: \(error)")
+
+        // Check whether git is available in the environment
+        if !isGitAvailable() {
+            gitMissingMessage = "Git is not installed or not available in the app's PATH. Please install Git or make it available to the app."
+            showGitMissingAlert = true
+            return
         }
-        showSaveAlert = true
-        // Clear inputs after adding
-        projectTitle = ""
-        projectDirectory = ""
-        dismiss()
+
+        // If it's already a git repo, save normally
+        if isGitRepository(trimmedPath) {
+            let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
+            modelContext.insert(repo)
+            print("AddRepoView: inserted repo \(sanitizedTitle) id=\(repo.id)")
+            do {
+                try modelContext.save()
+                saveMessage = "Saved \(sanitizedTitle)"
+                print("AddRepoView: modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
+                showSaveAlert = true
+                // Clear inputs after adding and dismiss only on successful save
+                projectTitle = ""
+                projectDirectory = ""
+                dismiss()
+            } catch {
+                saveMessage = "Save failed: \(error.localizedDescription)"
+                print("AddRepoView: modelContext.save() failed: \(error)")
+                showSaveAlert = true
+            }
+            return
+        }
+
+        // Git is available but folder isn't a repo: offer to initialize
+        pendingInitPath = trimmedPath
+        pendingInitTitle = sanitizedTitle
+        saveMessage = "The specified directory is not a git repository."
+        showInitConfirm = true
     }
-    
+
+    // Check whether git is available in the app environment
+    private func isGitAvailable() -> Bool {
+        let res = runCommand("git --version 2>/dev/null")
+        return res.status == 0
+    }
+
+    // Initialize a git repository at the given path, then save the repo entry on success
+    private func initializeRepo(path: String, title: String) {
+        // Ensure path exists and is a directory
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+            saveMessage = "The specified path does not exist or is not a directory."
+            showSaveAlert = true
+            return
+        }
+
+        let cmd = "cd \(shellEscape(path)) && git init"
+        let res = runCommand(cmd)
+        if res.status == 0 {
+            // After successful init, save the repo
+            let repo = SavedRepo(name: title, path: path)
+            modelContext.insert(repo)
+            do {
+                try modelContext.save()
+                saveMessage = "Initialized and saved \(title)"
+                print("AddRepoView: git init succeeded and saved repo \(title)")
+                showSaveAlert = true
+                projectTitle = ""
+                projectDirectory = ""
+                dismiss()
+            } catch {
+                saveMessage = "Repository initialized but failed to save: \(error.localizedDescription)"
+                showSaveAlert = true
+            }
+        } else {
+            saveMessage = "Failed to initialize git repository: \(res.output)"
+            showSaveAlert = true
+        }
+    }
+
     // Browse for directory helper (macOS)
     private func browseForDirectory() {
         #if os(macOS)
@@ -186,5 +243,33 @@ struct AddRepoView: View {
         #else
         // no-op on other platforms
         #endif
+    }
+
+    // Helper: safely quote a path for use in shell commands
+    private func shellEscape(_ s: String) -> String {
+        return "'" + s.replacingOccurrences(of: "'", with: "'\\'\''") + "'"
+    }
+
+    // Helper: determine whether a path is a git repository. Fast path checks for a .git folder, otherwise falls back to `git rev-parse`.
+    private func isGitRepository(_ path: String) -> Bool {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+            return false
+        }
+
+        // Fast heuristic: if a .git directory exists, treat it as a git repo
+        if fm.fileExists(atPath: (path as NSString).appendingPathComponent(".git")) {
+            return true
+        }
+
+        // Fallback: run git rev-parse --is-inside-work-tree to be robust for non-standard repos
+        let cmd = "cd \(shellEscape(path)) && git rev-parse --is-inside-work-tree 2>/dev/null"
+        let res = runCommand(cmd)
+        if res.status == 0 {
+            let out = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return out == "true"
+        }
+        return false
     }
 }
