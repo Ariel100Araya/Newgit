@@ -8,14 +8,20 @@ public struct Issue: Identifiable, Equatable {
     public let url: String
     public let body: String?
     public let webUrl: String?
+    // Author login who opened the issue
+    public let author: String?
+    // Assignees' logins
+    public let assignees: [String]
 
-    public init(number: Int, title: String, state: String, url: String, body: String?, webUrl: String? = nil) {
+    public init(number: Int, title: String, state: String, url: String, body: String?, webUrl: String? = nil, author: String? = nil, assignees: [String] = []) {
         self.number = number
         self.title = title
         self.state = state
         self.url = url
         self.body = body
         self.webUrl = webUrl
+        self.author = author
+        self.assignees = assignees
     }
 
     public var id: Int { number }

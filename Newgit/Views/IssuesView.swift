@@ -25,6 +25,11 @@ struct IssuesView: View {
     @State private var newIssueTitle: String = ""
     @State private var newIssueBody: String = ""
     @State private var isCreatingIssue: Bool = false
+    // Reply/comment state for the detail view
+    @State private var replyText: String = ""
+    @State private var isPostingComment: Bool = false
+    // Whether to include closed issues in the list
+    @State private var showAllIssues: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -69,6 +74,15 @@ struct IssuesView: View {
         .navigationTitle("Issues")
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
+                // Toggle show closed/all issues
+                Button(action: {
+                    showAllIssues.toggle()
+                    fetchIssues()
+                }) {
+                    Image(systemName: showAllIssues ? "eye.fill" : "eye")
+                }
+                .help(showAllIssues ? "Showing all issues (including closed)" : "Show closed issues")
+                
                 // Add issue
                 Button(action: {
                     print("Toolbar Add Issue tapped")
@@ -113,7 +127,10 @@ struct IssuesView: View {
         isLoading = true
         errorMessage = nil
         DispatchQueue.global(qos: .userInitiated).async {
-            let args = ["issue", "list", "--json", "number,title,state,url,body", "--limit", "100"]
+            // Request either only open issues or all issues
+            let stateArg = showAllIssues ? "all" : "open"
+            // include author and assignees so we can display who opened and who is assigned
+            let args = ["issue", "list", "--state", stateArg, "--json", "number,title,state,url,body,author,assignees", "--limit", "100"]
             let res = runGHCommand(args, currentDirectory: projectDirectory)
             let raw = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
             DispatchQueue.main.async {
@@ -137,7 +154,20 @@ struct IssuesView: View {
                             let state = (obj["state"] as? String ?? "").lowercased()
                             let url = (obj["url"] as? String) ?? ""
                             let body = obj["body"] as? String
-                            mapped.append(Issue(number: number, title: title, state: state, url: url, body: body))
+                            // parse author
+                            var author: String? = nil
+                            if let a = obj["author"] as? [String: Any], let login = a["login"] as? String {
+                                author = login
+                            }
+                            // parse assignees
+                            var assignees: [String] = []
+                            if let asArr = obj["assignees"] as? [[String: Any]] {
+                                for a in asArr {
+                                    if let login = a["login"] as? String { assignees.append(login) }
+                                }
+                            }
+
+                            mapped.append(Issue(number: number, title: title, state: state, url: url, body: body, webUrl: nil, author: author, assignees: assignees))
                         }
                         self.issues = mapped
                         self.selectedIssue = mapped.first
@@ -253,14 +283,25 @@ struct IssuesView: View {
     
     @ViewBuilder
     private var issueDetailView: some View {
-        IssueDetailView(issue: selectedIssue, comments: comments, isLoadingComments: isLoadingComments, commentsError: commentsError, onClose: closeIssue, onReopen: reopenIssue, onAdd: {
-            print("Detail Add tapped")
-            DispatchQueue.main.async {
-                activeSheet = .createIssue
-                showAddIssueSheet = true
-                NSApp.activate(ignoringOtherApps: true)
-            }
-        })
+        IssueDetailView(
+            issue: selectedIssue,
+            comments: comments,
+            isLoadingComments: isLoadingComments,
+            commentsError: commentsError,
+            onClose: closeIssue,
+            onReopen: reopenIssue,
+            onAdd: {
+                print("Detail Add tapped")
+                DispatchQueue.main.async {
+                    activeSheet = .createIssue
+                    showAddIssueSheet = true
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            },
+            replyBody: $replyText,
+            isPostingComment: isPostingComment,
+            onPost: { body in postComment(body: body) }
+        )
     }
     
     // Create issue sheet UI
@@ -310,6 +351,31 @@ struct IssuesView: View {
                     self.fetchIssues()
                 } else {
                     showAlert(title: "Failed to create issue", message: res.output)
+                }
+            }
+        }
+    }
+    
+    // Post a comment to the selected issue using `gh issue comment` and refresh the thread
+    private func postComment(body: String) {
+        guard let sel = selectedIssue else {
+            showAlert(title: "No issue selected", message: "Select an issue first.")
+            return
+        }
+        isPostingComment = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Use gh to post a comment
+            let args = ["issue", "comment", "\(sel.number)", "--body", body]
+            let res = runGHCommand(args, currentDirectory: projectDirectory)
+            DispatchQueue.main.async {
+                self.isPostingComment = false
+                if res.status == 0 {
+                    self.replyText = ""
+                    showAlert(title: "Comment posted", message: "Posted comment to issue #\(sel.number)")
+                    // Refresh comments
+                    fetchComments(for: sel)
+                } else {
+                    showAlert(title: "Failed to post comment", message: res.output)
                 }
             }
         }
