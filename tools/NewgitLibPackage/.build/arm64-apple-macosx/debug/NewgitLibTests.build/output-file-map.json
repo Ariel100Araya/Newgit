@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/master.swiftdeps"
+  },
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift": {
+    "dependencies": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.d",
+    "object": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o",
+    "swiftmodule": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swiftdeps",
+    "diagnostics": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.dia"
+  }
+}

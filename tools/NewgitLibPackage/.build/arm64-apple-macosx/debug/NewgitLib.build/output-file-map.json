@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/master.swiftdeps"
+  },
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift": {
+    "dependencies": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.d",
+    "object": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o",
+    "swiftmodule": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser~partial.swiftmodule",
+    "swift-dependencies": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swiftdeps",
+    "diagnostics": "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.dia"
+  }
+}
