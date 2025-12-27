@@ -1,0 +1,548 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.xctest/Contents/MacOS/NewgitLibPackageTests",
+      "packagePath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage",
+      "productName" : "NewgitLibPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.NewgitLib-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources",
+      "importPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "NewgitLib",
+      "moduleOutputPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule",
+      "objects" : [
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx12.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/include/NewgitLib-Swift.h",
+        "-swift-version",
+        "5",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g"
+      ],
+      "outputFileMapPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift"
+      ],
+      "tempsPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.NewgitLibPackageTests-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources",
+      "importPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "NewgitLibPackageTests",
+      "moduleOutputPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx12.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/include/NewgitLibPackageTests-Swift.h",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g"
+      ],
+      "outputFileMapPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.NewgitLibTests-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources",
+      "importPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "NewgitLibTests",
+      "moduleOutputPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule",
+      "objects" : [
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx12.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g"
+      ],
+      "outputFileMapPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift"
+      ],
+      "tempsPath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "NewgitLib" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "NewgitLib",
+      "-c",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift",
+      "-I",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx12.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/include/NewgitLib-Swift.h",
+      "-swift-version",
+      "5",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "NewgitLibPackageTests" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "NewgitLibPackageTests",
+      "-c",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx12.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/include/NewgitLibPackageTests-Swift.h",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "NewgitLibTests" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "NewgitLibTests",
+      "-c",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift",
+      "-I",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx12.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "NewgitLib" : [
+
+    ],
+    "NewgitLibPackageTests" : [
+      "NewgitLibTests",
+      "NewgitLib"
+    ],
+    "NewgitLibTests" : [
+      "NewgitLib"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources"
+    },
+    "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources"
+    },
+    "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources"
+    },
+    "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+    }
+  }
+}

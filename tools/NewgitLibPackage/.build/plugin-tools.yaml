@@ -1,0 +1,112 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "NewgitLib-arm64-apple-macosx26.0-debug.module": ["<NewgitLib-arm64-apple-macosx26.0-debug.module>"]
+  "NewgitLibPackageTests-arm64-apple-macosx26.0-debug.module": ["<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.module>"]
+  "NewgitLibPackageTests-arm64-apple-macosx26.0-debug.test": ["<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.test>"]
+  "NewgitLibTests-arm64-apple-macosx26.0-debug.module": ["<NewgitLibTests-arm64-apple-macosx26.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<NewgitLib-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<NewgitLib-arm64-apple-macosx26.0-debug.module>","<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.test>","<NewgitLibTests-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources"]
+    description: "Write auxiliary file /Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources"
+
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources"]
+    description: "Write auxiliary file /Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources"
+
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift"]
+
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList"
+
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources"]
+    description: "Write auxiliary file /Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources"
+
+  "/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<NewgitLib-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule"]
+    outputs: ["<NewgitLib-arm64-apple-macosx26.0-debug.module>"]
+
+  "<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibPackageTests.swiftmodule"]
+    outputs: ["<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.module>"]
+
+  "<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.test>":
+    tool: phony
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.xctest/Contents/MacOS/NewgitLibPackageTests"]
+    outputs: ["<NewgitLibPackageTests-arm64-apple-macosx26.0-debug.test>"]
+
+  "<NewgitLibTests-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule"]
+    outputs: ["<NewgitLibTests-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.NewgitLib-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/IssueParser.swift","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule"]
+    description: "Compiling Swift Module 'NewgitLib' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","NewgitLib","-emit-dependencies","-emit-module","-emit-module-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule","-output-file-map","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/sources","-I","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx12.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/include/NewgitLib-Swift.h","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g"]
+
+  "C.NewgitLibPackageTests-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.derived/runner.swift","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibPackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'NewgitLibPackageTests' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","NewgitLibPackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibPackageTests.swiftmodule","-output-file-map","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/sources","-I","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx12.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/include/NewgitLibPackageTests-Swift.h","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g"]
+
+  "C.NewgitLibPackageTests-arm64-apple-macosx26.0-debug.test":
+    tool: shell
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLib.build/IssueParser.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.build/runner.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.xctest/Contents/MacOS/NewgitLibPackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/NewgitLibPackageTests.xctest/Contents/MacOS/NewgitLibPackageTests"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug","-o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.xctest/Contents/MacOS/NewgitLibPackageTests","-module-name","NewgitLibPackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibPackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx12.0","-Xlinker","-add_ast_path","-Xlinker","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibPackageTests.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.NewgitLibTests-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/IssueParserTests.swift","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLib.swiftmodule","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources"]
+    outputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/IssueParserTests.swift.o","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule"]
+    description: "Compiling Swift Module 'NewgitLibTests' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","NewgitLibTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules/NewgitLibTests.swiftmodule","-output-file-map","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/NewgitLibTests.build/sources","-I","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx12.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Sources/NewgitLib/","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Tests/NewgitLibTests/","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Package.swift","/Users/arielaraya-madrigal/Documents/Projects/Newgit/tools/NewgitLibPackage/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
