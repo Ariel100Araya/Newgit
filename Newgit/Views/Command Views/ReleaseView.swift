@@ -2,7 +2,7 @@
 //  ReleaseView.swift
 //  Newgit
 //
-//  Created by Copilot on behalf of user.
+//  Created by Ariel Araya-Madrigal on 12/6/25.
 //
 
 import SwiftUI
