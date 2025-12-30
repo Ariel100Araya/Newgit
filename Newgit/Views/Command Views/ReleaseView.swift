@@ -2,7 +2,7 @@
 //  ReleaseView.swift
 //  Newgit
 //
-//  Created by Copilot on behalf of user.
+//  Created by Ariel Araya-Madrigal on 12/6/25.
 //
 
 import SwiftUI
@@ -33,6 +33,7 @@ struct ReleaseView: View {
     // Optimistic UI state: show a success panel immediately when release starts
     @State private var showSuccessView: Bool = false
     @State private var trigger: Int = 0 // for triggering confetti
+    @FocusState private var tagFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -57,6 +58,8 @@ struct ReleaseView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Tag (e.g. v1.0.0)", text: $tag)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .focused($tagFieldFocused)
+                            .onSubmit { createRelease() }
 
                         TextField("Title (optional)", text: $releaseTitle)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -230,163 +233,177 @@ struct ReleaseView: View {
 
     // MARK: - Action
     private func createRelease() {
-        guard !isCreating else { return }
-        let t = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
+        // First ensure the Tag TextField loses focus so its in-progress edit is committed.
+        // Prefer using SwiftUI's FocusState when available.
+        tagFieldFocused = false
 
-        isCreating = true
-        // Optimistic UI: hide the form and show the compact "it's on it's way" view
-        // immediately so the user sees the action is underway.
-        showOutput = false
-        commandOutput = ""
-        withAnimation {
-            self.showSuccessView = true
+#if os(macOS)
+        // Fallback: also ask AppKit to resign first responder to cover edge cases.
+        DispatchQueue.main.async {
+            NSApp.keyWindow?.makeFirstResponder(nil)
         }
+#endif
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            var args: [String] = ["release", "create", t]
-            if !releaseTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                args.append("--title")
-                args.append(releaseTitle)
-            }
-            if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                args.append("--notes")
-                args.append(notes)
+        // Run the main action on the next runloop tick so the TextField can commit its value.
+        DispatchQueue.main.async {
+            guard !self.isCreating else { return }
+            let t = self.tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { return }
+
+            self.isCreating = true
+            // Optimistic UI: hide the form and show the compact "it's on its way" view
+            // immediately so the user sees the action is underway.
+            self.showOutput = false
+            self.commandOutput = ""
+            withAnimation {
+                self.showSuccessView = true
             }
 
-            // Prepare assets in a unique temporary directory for this run. This lets us:
-            // - create zip files named exactly like the original bundle (e.g. Newgit.app.zip)
-            // - copy regular files into the temp dir so uploads originate from a single, unique location
-            // This avoids using `--name` and prevents filename collisions when multiple releases run concurrently.
-            let runTmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            var assetPaths: [String] = []
-            do {
-                try FileManager.default.createDirectory(at: runTmpDir, withIntermediateDirectories: true, attributes: nil)
-            } catch {
-                DispatchQueue.main.async {
-                    self.isCreating = false
-                    self.commandOutput = "Failed to create temporary directory: \(error.localizedDescription)"
-                    self.showErrorAlert = true
+            DispatchQueue.global(qos: .userInitiated).async {
+                var args: [String] = ["release", "create", t]
+                if !self.releaseTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    args.append("--title")
+                    args.append(self.releaseTitle)
                 }
-                return
-            }
+                if !self.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    args.append("--notes")
+                    args.append(self.notes)
+                }
 
-            for f in selectedFiles {
-                var isDir: ObjCBool = false
-                let exists = FileManager.default.fileExists(atPath: f.path, isDirectory: &isDir)
-
-                if !exists {
+                // Prepare assets in a unique temporary directory for this run. This lets us:
+                // - create zip files named exactly like the original bundle (e.g. Newgit.app.zip)
+                // - copy regular files into the temp dir so uploads originate from a single, unique location
+                // This avoids using `--name` and prevents filename collisions when multiple releases run concurrently.
+                let runTmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                var assetPaths: [String] = []
+                do {
+                    try FileManager.default.createDirectory(at: runTmpDir, withIntermediateDirectories: true, attributes: nil)
+                } catch {
                     DispatchQueue.main.async {
-                        self.commandOutput += "\nAsset not found: \(f.path). Skipping."
+                        self.isCreating = false
+                        self.commandOutput = "Failed to create temporary directory: \(error.localizedDescription)"
+                        self.showErrorAlert = true
                     }
-                    continue
+                    return
                 }
 
-                if isDir.boolValue {
-                    // Create a zip in the run temp dir named <bundle>.zip so GitHub will display that basename.
-                    let zipName = "\(f.lastPathComponent).zip"
-                    let zipURL = runTmpDir.appendingPathComponent(zipName)
+                for f in self.selectedFiles {
+                    var isDir: ObjCBool = false
+                    let exists = FileManager.default.fileExists(atPath: f.path, isDirectory: &isDir)
 
-                    // Zip from the bundle's parent so the archive contains the bundle directory
-                    let proc = Process()
-                    proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-                    proc.currentDirectoryURL = f.deletingLastPathComponent()
-                    proc.arguments = ["-r", zipURL.path, f.lastPathComponent]
+                    if !exists {
+                        DispatchQueue.main.async {
+                            self.commandOutput += "\nAsset not found: \(f.path). Skipping."
+                        }
+                        continue
+                    }
 
-                    do {
-                        try proc.run()
-                        proc.waitUntilExit()
-                        if proc.terminationStatus == 0 {
-                            assetPaths.append(zipURL.path)
-                        } else {
+                    if isDir.boolValue {
+                        // Create a zip in the run temp dir named <bundle>.zip so GitHub will display that basename.
+                        let zipName = "\(f.lastPathComponent).zip"
+                        let zipURL = runTmpDir.appendingPathComponent(zipName)
+
+                        // Zip from the bundle's parent so the archive contains the bundle directory
+                        let proc = Process()
+                        proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+                        proc.currentDirectoryURL = f.deletingLastPathComponent()
+                        proc.arguments = ["-r", zipURL.path, f.lastPathComponent]
+
+                        do {
+                            try proc.run()
+                            proc.waitUntilExit()
+                            if proc.terminationStatus == 0 {
+                                assetPaths.append(zipURL.path)
+                            } else {
+                                DispatchQueue.main.async {
+                                    self.commandOutput += "\nFailed to zip \(f.lastPathComponent) (zip exit \(proc.terminationStatus)). Skipping this asset."
+                                }
+                            }
+                        } catch {
                             DispatchQueue.main.async {
-                                self.commandOutput += "\nFailed to zip \(f.lastPathComponent) (zip exit \(proc.terminationStatus)). Skipping this asset."
+                                self.commandOutput += "\nError creating zip for \(f.lastPathComponent): \(error). Skipping this asset."
                             }
                         }
-                    } catch {
-                        DispatchQueue.main.async {
-                            self.commandOutput += "\nError creating zip for \(f.lastPathComponent): \(error). Skipping this asset."
-                        }
-                    }
-                } else {
-                    // Regular file - copy into the run tmp dir so it has the correct basename and uploads from a unique location
-                    let dest = runTmpDir.appendingPathComponent(f.lastPathComponent)
-                    do {
-                        // Remove any existing file at destination then copy
-                        if FileManager.default.fileExists(atPath: dest.path) {
-                            try FileManager.default.removeItem(at: dest)
-                        }
-                        try FileManager.default.copyItem(at: f, to: dest)
-                        assetPaths.append(dest.path)
-                    } catch {
-                        DispatchQueue.main.async {
-                            self.commandOutput += "\nFailed to copy \(f.lastPathComponent) to temp dir: \(error). Skipping."
-                        }
-                    }
-                }
-            }
-
-            // Do not append asset paths to the create command. We create the release first
-            // and upload assets individually so we can control their displayed names and
-            // handle gh versions that don't support --name.
-
-            // Run gh
-            let createRes = runGHCommand(args, currentDirectory: projectDirectory)
-            let createRaw = createRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            var uploadErrors: [String] = []
-            if createRes.status == 0 {
-                for p in assetPaths {
-                    let basename = URL(fileURLWithPath: p).lastPathComponent
-                    // Upload using the file's basename as the asset name. We prepared files
-                    // in a unique temp dir using the desired basenames, so `gh` will use
-                    // that basename for the asset. Use --clobber to overwrite existing assets.
-                    let upArgs: [String] = ["release", "upload", t, p, "--clobber"]
-                    let upRes = runGHCommand(upArgs, currentDirectory: projectDirectory)
-                    let upOut = upRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    DispatchQueue.main.async {
-                        self.commandOutput += "\n[upload \(basename)] \(upOut)"
-                    }
-                    if upRes.status != 0 {
-                        uploadErrors.append("Failed to upload \(basename): exit \(upRes.status).")
-                    }
-                }
-            }
-
-            // cleanup run temp directory
-            try? FileManager.default.removeItem(at: runTmpDir)
-
-            DispatchQueue.main.async {
-                self.isCreating = false
-
-                // Preserve create output and any appended per-upload output in the console
-                let currentUploadsOutput = self.commandOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-                self.commandOutput = createRaw + (currentUploadsOutput.isEmpty ? "" : "\n" + currentUploadsOutput)
-
-                if createRes.status == 0 && uploadErrors.isEmpty {
-                    self.showErrorAlert = false
-                    // Release succeeded. Show confetti then dismiss after a short delay.
-                    withAnimation {
-                        self.trigger += 1 // fire confetti once
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        dismiss()
-                    }
-                } else {
-                    // Failure: hide the optimistic success view, show the form/console with details
-                    self.showSuccessView = false
-                    // ensure the console is visible so the user can see output
-                    self.showOutput = true
-
-                    // Build a concise error summary
-                    if !uploadErrors.isEmpty {
-                        self.errorSummary = uploadErrors.joined(separator: "\n")
-                    } else if !createRaw.isEmpty {
-                        self.errorSummary = createRaw
                     } else {
-                        self.errorSummary = "gh returned an error (exit \(createRes.status))."
+                        // Regular file - copy into the run tmp dir so it has the correct basename and uploads from a unique location
+                        let dest = runTmpDir.appendingPathComponent(f.lastPathComponent)
+                        do {
+                            // Remove any existing file at destination then copy
+                            if FileManager.default.fileExists(atPath: dest.path) {
+                                try FileManager.default.removeItem(at: dest)
+                            }
+                            try FileManager.default.copyItem(at: f, to: dest)
+                            assetPaths.append(dest.path)
+                        } catch {
+                            DispatchQueue.main.async {
+                                self.commandOutput += "\nFailed to copy \(f.lastPathComponent) to temp dir: \(error). Skipping."
+                            }
+                        }
                     }
-                    self.showErrorAlert = true
+                }
+
+                // Do not append asset paths to the create command. We create the release first
+                // and upload assets individually so we can control their displayed names and
+                // handle gh versions that don't support --name.
+
+                // Run gh
+                let createRes = runGHCommand(args, currentDirectory: self.projectDirectory)
+                let createRaw = createRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                var uploadErrors: [String] = []
+                if createRes.status == 0 {
+                    for p in assetPaths {
+                        let basename = URL(fileURLWithPath: p).lastPathComponent
+                        // Upload using the file's basename as the asset name. We prepared files
+                        // in a unique temp dir using the desired basenames, so `gh` will use
+                        // that basename for the asset. Use --clobber to overwrite existing assets.
+                        let upArgs: [String] = ["release", "upload", t, p, "--clobber"]
+                        let upRes = runGHCommand(upArgs, currentDirectory: self.projectDirectory)
+                        let upOut = upRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                        DispatchQueue.main.async {
+                            self.commandOutput += "\n[upload \(basename)] \(upOut)"
+                        }
+                        if upRes.status != 0 {
+                            uploadErrors.append("Failed to upload \(basename): exit \(upRes.status).")
+                        }
+                    }
+                }
+
+                // cleanup run temp directory
+                try? FileManager.default.removeItem(at: runTmpDir)
+
+                DispatchQueue.main.async {
+                    self.isCreating = false
+
+                    // Preserve create output and any appended per-upload output in the console
+                    let currentUploadsOutput = self.commandOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.commandOutput = createRaw + (currentUploadsOutput.isEmpty ? "" : "\n" + currentUploadsOutput)
+
+                    if createRes.status == 0 && uploadErrors.isEmpty {
+                        self.showErrorAlert = false
+                        // Release succeeded. Show confetti then dismiss after a short delay.
+                        withAnimation {
+                            self.trigger += 1 // fire confetti once
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            self.dismiss()
+                        }
+                    } else {
+                        // Failure: hide the optimistic success view, show the form/console with details
+                        self.showSuccessView = false
+                        // ensure the console is visible so the user can see output
+                        self.showOutput = true
+
+                        // Build a concise error summary
+                        if !uploadErrors.isEmpty {
+                            self.errorSummary = uploadErrors.joined(separator: "\n")
+                        } else if !createRaw.isEmpty {
+                            self.errorSummary = createRaw
+                        } else {
+                            self.errorSummary = "gh returned an error (exit \(createRes.status))."
+                        }
+                        self.showErrorAlert = true
+                    }
                 }
             }
         }
