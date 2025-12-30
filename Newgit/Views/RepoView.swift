@@ -33,6 +33,8 @@ struct RepoView: View {
     // New states for branch actions
     @State private var showAddBranchSheet: Bool = false
     @State private var newBranchName: String = ""
+    @State private var showDeleteBranchSheet: Bool = false
+    @State private var branchToDelete: String = ""
     
     @State private var showMergeSheet: Bool = false
     @State private var mergeTargetBranch: String = ""
@@ -187,6 +189,13 @@ struct RepoView: View {
                                 showAddBranchSheet = true
                             }
                         }
+                        Button("Delete Branch...") {
+                            // choose a sensible default (first branch that's not current)
+                            branchToDelete = branches.first(where: { $0 != currentBranch }) ?? ""
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                showDeleteBranchSheet = true
+                            }
+                        }
                         Button("Merge current into…") {
                             // Default to first branch that's not the current one
                             mergeTargetBranch = branches.first(where: { $0 != currentBranch }) ?? ""
@@ -313,6 +322,53 @@ struct RepoView: View {
                 }
                 .padding()
                 .frame(minWidth: 420, minHeight: 140)
+            }
+            
+            // Delete Branch sheet
+            .sheet(isPresented: $showDeleteBranchSheet) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Delete a branch")
+                        .font(.headline)
+                    
+                    if branches.filter({ $0 != currentBranch }).isEmpty {
+                        Text("No other branches available to delete.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Picker("Branch to delete", selection: $branchToDelete) {
+                            ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
+                                Text(b).tag(b)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .onAppear {
+                            if branchToDelete.isEmpty {
+                                branchToDelete = branches.first(where: { $0 != currentBranch }) ?? ""
+                            }
+                        }
+                    }
+                    
+                    Text("This will delete the selected local branch. If it has unmerged commits, a force-delete will be attempted.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        Spacer()
+                        Button("Cancel") {
+                            showDeleteBranchSheet = false
+                        }
+                        Button("Delete") {
+                            let toDelete = branchToDelete.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !toDelete.isEmpty else { return }
+                            showDeleteBranchSheet = false
+                            deleteBranch(toDelete)
+                        }
+                        .foregroundColor(.red)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(branches.filter({ $0 != currentBranch }).isEmpty)
+                    }
+                }
+                .padding()
+                .frame(minWidth: 480, minHeight: 160)
             }
             
             // Merge sheet
@@ -789,6 +845,39 @@ struct RepoView: View {
                     }
                 } else {
                     showAlert(title: "Create branch failed", message: res.output)
+                }
+            }
+        }
+    }
+    
+    private func deleteBranch(_ branch: String) {
+        let b = branch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !b.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Attempt safe delete first (-d)
+            let safeCmd = "cd \(shellEscape(projectDirectory)) && git branch -d \(shellEscape(b))"
+            print("RepoView.deleteBranch: running: \(safeCmd)")
+            let safeRes = runCommand(safeCmd)
+            print("RepoView.deleteBranch: safe exit=\(safeRes.status) output=\(safeRes.output)")
+            if safeRes.status == 0 {
+                DispatchQueue.main.async {
+                    showAlert(title: "Branch deleted", message: "Deleted branch \(b)")
+                    refreshRepositoryState()
+                }
+                return
+            }
+
+            // Safe delete failed; try force delete (-D)
+            let forceCmd = "cd \(shellEscape(projectDirectory)) && git branch -D \(shellEscape(b))"
+            print("RepoView.deleteBranch: attempting force delete: \(forceCmd)")
+            let forceRes = runCommand(forceCmd)
+            print("RepoView.deleteBranch: force exit=\(forceRes.status) output=\(forceRes.output)")
+            DispatchQueue.main.async {
+                if forceRes.status == 0 {
+                    showAlert(title: "Branch deleted", message: "Force-deleted branch \(b)")
+                    refreshRepositoryState()
+                } else {
+                    showAlert(title: "Delete failed", message: "Could not delete branch \(b).\n\nOutput:\n\(safeRes.output)\n\(forceRes.output)")
                 }
             }
         }
