@@ -223,6 +223,12 @@ struct RepoView: View {
                         Button("Push") { showPush = true }
                             .disabled(!canPush)
                         Divider()
+                        Button("Go back to previous commit") {
+                            // Confirm with the user before performing the revert
+                            confirmAndRevertLatestCommit()
+                        }
+                        .help("Create a new commit that reverts the latest commit (HEAD). Requires a clean working tree.")
+                        Divider()
                         Button("Show issues") {
                             // Navigate to the Issues view (it will fetch its own data on appear)
                             showIssuesLink = true
@@ -562,6 +568,69 @@ struct RepoView: View {
             NSWorkspace.shared.open(url)
         } else {
             showAlert(title: "Not a GitHub remote", message: "The configured remote does not appear to point to GitHub: \(candidate)")
+        }
+    }
+    
+    // Confirm with the user and then revert the latest commit (HEAD).
+    private func confirmAndRevertLatestCommit() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Revert latest commit?"
+            alert.informativeText = "This will create a new commit that undoes the most recent commit (HEAD). This operation requires a clean working tree. Do you want to continue?"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Revert")
+            alert.addButton(withTitle: "Cancel")
+            if let window = NSApplication.shared.keyWindow {
+                alert.beginSheetModal(for: window) { response in
+                    if response == .alertFirstButtonReturn {
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            revertLatestCommit()
+                        }
+                    }
+                }
+            } else {
+                if alert.runModal() == .alertFirstButtonReturn {
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        revertLatestCommit()
+                    }
+                }
+            }
+        }
+    }
+
+    private func revertLatestCommit() {
+        // Verify there is at least one commit
+        let headCheck = "cd \(shellEscape(projectDirectory)) && git rev-parse --verify HEAD >/dev/null 2>&1"
+        let headRes = runCommand(headCheck)
+        if headRes.status != 0 {
+            DispatchQueue.main.async {
+                showAlert(title: "No commits", message: "Repository has no commits to revert.")
+            }
+            return
+        }
+
+        // Ensure working tree is clean so revert can proceed without leaving conflicts
+        let statusCmd = "cd \(shellEscape(projectDirectory)) && git status --porcelain"
+        let statusRes = runCommand(statusCmd)
+        if !statusRes.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            DispatchQueue.main.async {
+                showAlert(title: "Working tree not clean", message: "Please commit or stash your changes before reverting the latest commit.")
+            }
+            return
+        }
+
+        // Perform the revert (non-interactive)
+        let revertCmd = "cd \(shellEscape(projectDirectory)) && git revert --no-edit HEAD"
+        print("RepoView.revertLatestCommit: running: \(revertCmd)")
+        let res = runCommand(revertCmd)
+        print("RepoView.revertLatestCommit: exit=\(res.status) output=\(res.output)")
+        DispatchQueue.main.async {
+            if res.status == 0 {
+                showAlert(title: "Revert succeeded", message: "Reverted latest commit.\n\n\(res.output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                refreshRepositoryState()
+            } else {
+                showAlert(title: "Revert failed", message: res.output)
+            }
         }
     }
     
