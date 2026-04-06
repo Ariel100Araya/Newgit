@@ -143,6 +143,16 @@ struct PushView: View {
          return nil
      }
 
+     private func currentBranchName(in escapedDirectory: String) -> (name: String?, output: String, status: Int32) {
+         let branchCmd = "cd \(escapedDirectory) && git rev-parse --abbrev-ref HEAD"
+         let branchRes = runCommand(branchCmd)
+         let combined = "$ \(branchCmd)\n" + branchRes.output + "\nexit=\(branchRes.status)\n\n"
+         let name = branchRes.status == 0
+             ? branchRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+             : nil
+         return (name, combined, branchRes.status)
+     }
+
      private func checkIfPullNeeded(in escapedDirectory: String) -> (needsPull: Bool, output: String, status: Int32) {
          var combined = ""
 
@@ -234,11 +244,11 @@ struct PushView: View {
                  }
              }
 
-             let pullCheck = checkIfPullNeeded(in: dir)
-             combined += pullCheck.output
-             if pullCheck.status != 0 {
-                 let short = pullCheck.output.split(separator: "\n").last.map(String.init) ?? "Could not verify remote branch state"
-                 DispatchQueue.main.async {
+         let pullCheck = checkIfPullNeeded(in: dir)
+         combined += pullCheck.output
+         if pullCheck.status != 0 {
+             let short = pullCheck.output.split(separator: "\n").last.map(String.init) ?? "Could not verify remote branch state"
+             DispatchQueue.main.async {
                      self.commandOutput = combined
                      self.showCommandOutput = true
                      self.errorSummary = "Pre-push check failed: \(short)"
@@ -260,8 +270,31 @@ struct PushView: View {
                  return
              }
 
+             let upstreamCheckCmd = "cd \(dir) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
+             let upstreamCheckRes = runCommand(upstreamCheckCmd)
+             combined += "$ \(upstreamCheckCmd)\n" + upstreamCheckRes.output + "\nexit=\(upstreamCheckRes.status)\n\n"
+
+             let pushCmd: String
+             if upstreamCheckRes.status == 0 {
+                 pushCmd = "cd \(dir) && git push"
+             } else {
+                 let branchInfo = currentBranchName(in: dir)
+                 combined += branchInfo.output
+                 guard branchInfo.status == 0, let branchName = branchInfo.name, !branchName.isEmpty else {
+                     DispatchQueue.main.async {
+                         self.commandOutput = combined
+                         self.showCommandOutput = true
+                         self.errorSummary = "Push failed: could not determine the current branch name."
+                         self.showErrorAlert = true
+                         self.isProcessing = false
+                         self.showSuccessView = false
+                     }
+                     return
+                 }
+                 pushCmd = "cd \(dir) && git push --set-upstream origin \(shellEscape(branchName))"
+             }
+
              // git push
-             let pushCmd = "cd \(dir) && git push"
              let pushRes = runCommand(pushCmd)
              combined += "$ \(pushCmd)\n" + pushRes.output + "\nexit=\(pushRes.status)\n\n"
 
