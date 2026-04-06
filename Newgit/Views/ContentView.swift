@@ -206,6 +206,7 @@ struct ContentView: View {
         modelContext.delete(repo)
         do {
             try modelContext.save()
+            SavedRepoBackupStore.shared.sync(repos: savedRepos.filter { $0.id != repo.id })
             deleteResultMessage = "Deleted \(repo.name)"
             print("ContentView: modelContext.save() succeeded")
         } catch {

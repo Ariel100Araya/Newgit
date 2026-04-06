@@ -158,6 +158,7 @@ struct CloneRepoView: View {
                     modelContext.insert(repo)
                     do {
                         try modelContext.save()
+                        SavedRepoBackupStore.shared.sync(repos: savedRepos + [repo])
                         saveMessage = "Saved \(sanitizedTitle)"
                     } catch {
                         saveMessage = "Save failed: \(error.localizedDescription)"
@@ -269,6 +270,7 @@ struct CloneRepoView: View {
                 modelContext.insert(repo)
                 do {
                     try modelContext.save()
+                    SavedRepoBackupStore.shared.sync(repos: savedRepos + [repo])
                     cloneMessage = "Cloned and saved \(nameToSave)"
                     dismiss()
                 } catch {
