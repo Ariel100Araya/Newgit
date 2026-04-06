@@ -85,6 +85,7 @@ struct AddNewRepoView: View {
                     modelContext.insert(repo)
                     do {
                         try modelContext.save()
+                        SavedRepoBackupStore.shared.sync(repos: savedRepos + [repo])
                         saveMessage = "Saved \(sanitizedTitle)"
                     } catch {
                         saveMessage = "Save failed: \(error.localizedDescription)"
@@ -252,6 +253,7 @@ struct AddNewRepoView: View {
                 modelContext.insert(repo)
                 do {
                     try modelContext.save()
+                    SavedRepoBackupStore.shared.sync(repos: savedRepos + [repo])
                     publishMessage = "Created and published \(title)"
                 } catch {
                     publishMessage = "Published but failed to save: \(error.localizedDescription)"
