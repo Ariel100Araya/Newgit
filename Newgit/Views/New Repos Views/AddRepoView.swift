@@ -26,6 +26,13 @@ struct AddRepoView: View {
     @State private var pendingInitPath: String = ""
     @State private var pendingInitTitle: String = ""
 
+    init(initialDirectory: String? = nil) {
+        let suggestedDirectory = initialDirectory ?? "\(NSHomeDirectory())/Documents/Projects/"
+        let suggestedTitle = initialDirectory.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+        _projectDirectory = State(initialValue: suggestedDirectory)
+        _projectTitle = State(initialValue: suggestedTitle)
+    }
+
     var body: some View {
         VStack(alignment: .leading) {
             Text("Enter a project directory")
