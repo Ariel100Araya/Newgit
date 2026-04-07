@@ -169,7 +169,7 @@ struct PullRequestsView: View {
 
     private func mergePR(_ pr: PullRequest) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let args = ["pr", "merge", "\(pr.number)"]
+            let args = ["pr", "merge", "\(pr.number)", "--merge"]
             let res = runGHCommand(args, currentDirectory: projectDirectory)
             DispatchQueue.main.async {
                 if res.status == 0 {
