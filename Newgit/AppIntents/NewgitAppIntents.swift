@@ -770,20 +770,6 @@ struct SavedBranchEntityQuery: EntityQuery {
     }
 }
 
-struct PushBranchEntityQuery: EntityQuery {
-    @IntentParameterDependency<PushRepositoryIntent>(\.$repository)
-    var intent
-
-    func entities(for identifiers: [SavedBranchEntity.ID]) async throws -> [SavedBranchEntity] {
-        identifiers.compactMap(RepoIntentSupport.branchEntity(for:))
-    }
-
-    func suggestedEntities() async throws -> [SavedBranchEntity] {
-        guard let repository = intent?.repository else { return [] }
-        return try RepoIntentSupport.branchEntities(at: repository.path)
-    }
-}
-
 struct PullBranchEntityQuery: EntityQuery {
     @IntentParameterDependency<PullRepositoryIntent>(\.$repository)
     var intent
@@ -856,11 +842,11 @@ struct MergeTargetBranchEntityQuery: EntityQuery {
 
 struct AddRepositoryIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Repository"
-    static var description = IntentDescription("Save a local repository from a user-defined path.")
-    static var openAppWhenRun = false
+    static var description = IntentDescription("Save a local repository from a selected folder.")
+    static var openAppWhenRun = true
 
-    @Parameter(title: "Repository Path")
-    var repositoryPath: String
+    @Parameter(title: "Repository Folder")
+    var repositoryFolder: IntentFile
 
     @Parameter(title: "Repository Name")
     var repositoryName: String?
@@ -869,7 +855,7 @@ struct AddRepositoryIntent: AppIntent {
     var initializeIfNeeded: Bool
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Add the repository at \(\.$repositoryPath)") {
+        Summary("Add \(\.$repositoryFolder)") {
             \.$repositoryName
             \.$initializeIfNeeded
         }
@@ -877,37 +863,15 @@ struct AddRepositoryIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
+            guard let repositoryPath = repositoryFolder.fileURL?.path(percentEncoded: false) else {
+                throw RepoIntentError.invalidInput("Couldn't read the selected folder path.")
+            }
             let snapshot = try RepoIntentSupport.addRepository(
                 at: repositoryPath,
                 name: repositoryName,
                 initializeIfNeeded: initializeIfNeeded
             )
             return .result(dialog: IntentDialog(stringLiteral: "Saved \(snapshot.name) at \(snapshot.path)."))
-        } catch {
-            throw RepoIntentSupport.presentableError(error)
-        }
-    }
-}
-
-struct PushRepositoryIntent: AppIntent {
-    static var title: LocalizedStringResource = "Push Repository"
-    static var description = IntentDescription("Push a selected branch for a local repository.")
-    static var openAppWhenRun = false
-
-    @Parameter(title: "Repository")
-    var repository: SavedRepositoryEntity
-
-    @Parameter(title: "Branch", optionsProvider: PushBranchEntityQuery())
-    var branch: SavedBranchEntity
-
-    static var parameterSummary: some ParameterSummary {
-        Summary("Push \(\.$branch) for \(\.$repository)")
-    }
-
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        do {
-            let message = try RepoIntentSupport.pushRepository(at: repository.path, branch: branch.name)
-            return .result(dialog: IntentDialog(stringLiteral: message))
         } catch {
             throw RepoIntentSupport.presentableError(error)
         }

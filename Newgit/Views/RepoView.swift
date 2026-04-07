@@ -38,11 +38,15 @@ struct RepoView: View {
     
     @State private var showMergeSheet: Bool = false
     @State private var mergeTargetBranch: String = ""
-    
+
     @State private var showPRSheet: Bool = false
     @State private var prTitle: String = ""
     @State private var prBody: String = ""
     @State private var prBaseBranch: String = ""
+    
+    @State private var showStashSheet: Bool = false
+    @State private var stashMessage: String = ""
+    @State private var stashIncludeUntracked: Bool = true
     
     // Navigation state for the Issues screen
     @State private var showIssuesLink: Bool = false
@@ -222,6 +226,12 @@ struct RepoView: View {
                         Button("Pull") { performPull() }
                         Button("Push") { showPush = true }
                             .disabled(!canPush)
+                        Button("Stash Changes...") {
+                            stashMessage = ""
+                            stashIncludeUntracked = true
+                            showStashSheet = true
+                        }
+                            .disabled(changedFiles.isEmpty)
                         Divider()
                         Button("Go back to previous commit") {
                             // Confirm with the user before performing the revert
@@ -457,6 +467,35 @@ struct RepoView: View {
                 .padding()
                 .frame(minWidth: 520, minHeight: 320)
             }
+            .sheet(isPresented: $showStashSheet) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Stash changes")
+                        .font(.headline)
+                    
+                    TextField("Message (optional)", text: $stashMessage)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    Toggle("Include untracked files", isOn: $stashIncludeUntracked)
+                    
+                    Text("This stores your current working changes in Git and refreshes the repo view.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        Spacer()
+                        Button("Cancel") {
+                            showStashSheet = false
+                        }
+                        Button("Stash") {
+                            showStashSheet = false
+                            performStash(message: stashMessage, includeUntracked: stashIncludeUntracked)
+                        }
+                        .keyboardShortcut(.defaultAction)
+                    }
+                }
+                .padding()
+                .frame(minWidth: 420, minHeight: 170)
+            }
             // Load the changed files when the view appears (do heavy work off the main thread so UI remains responsive)
             .navigationDestination(isPresented: $showIssuesLink) {
                 IssuesView(projectDirectory: projectDirectory)
@@ -494,6 +533,10 @@ struct RepoView: View {
             }
             .onChange(of: showPRSheet) { oldValue, newValue in
                 print("showPRSheet changed -> \(newValue) (old=\(oldValue))")
+                if newValue == false { refreshRepositoryState() }
+            }
+            .onChange(of: showStashSheet) { oldValue, newValue in
+                print("showStashSheet changed -> \(newValue) (old=\(oldValue))")
                 if newValue == false { refreshRepositoryState() }
             }
             .onChange(of: currentBranch) { old, new in
@@ -882,6 +925,43 @@ struct RepoView: View {
         }
     }
     
+    private func performStash(message: String, includeUntracked: Bool) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let statusCmd = "cd \(shellEscape(projectDirectory)) && git status --porcelain"
+            let statusRes = runCommand(statusCmd)
+            if statusRes.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                DispatchQueue.main.async {
+                    showAlert(title: "Nothing to stash", message: "There are no local changes to stash right now.")
+                }
+                return
+            }
+            
+            var stashCmd = "cd \(shellEscape(projectDirectory)) && git stash push"
+            if includeUntracked {
+                stashCmd += " --include-untracked"
+            }
+            let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedMessage.isEmpty {
+                stashCmd += " -m \(shellEscape(trimmedMessage))"
+            }
+            
+            print("RepoView.performStash: running: \(stashCmd)")
+            let res = runCommand(stashCmd)
+            print("RepoView.performStash: exit=\(res.status) output=\(res.output)")
+            
+            refreshRepositoryState()
+            
+            DispatchQueue.main.async {
+                let output = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if res.status == 0 {
+                    showAlert(title: "Stash created", message: output.isEmpty ? "Your local changes were stashed." : output)
+                } else {
+                    showAlert(title: "Stash failed", message: output.isEmpty ? "git stash returned an error." : output)
+                }
+            }
+        }
+    }
+
     // Run an immediate refresh in the background and schedule follow-up refreshes
     // to handle any timing races with git or other processes.
     private func refreshRepositoryState() {
