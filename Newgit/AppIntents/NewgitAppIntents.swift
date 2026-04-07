@@ -596,6 +596,29 @@ private enum RepoIntentSupport {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n\n", with: "\n")
     }
+
+    nonisolated static func openRepositoryInApp(at path: String) throws -> String {
+        let normalizedPath = try normalizedDirectory(at: path)
+        NotificationCenter.default.post(name: .newgitOpenRepository, object: normalizedPath)
+        return "Opening repository in Newgit."
+    }
+
+    nonisolated static func openIssuesInApp(at path: String) throws -> String {
+        let normalizedPath = try normalizedDirectory(at: path)
+        NotificationCenter.default.post(name: .newgitOpenIssues, object: normalizedPath)
+        return "Opening issues in Newgit."
+    }
+
+    nonisolated static func openReleaseInApp(at path: String) throws -> String {
+        let normalizedPath = try normalizedDirectory(at: path)
+        NotificationCenter.default.post(name: .newgitOpenRelease, object: normalizedPath)
+        return "Opening release view in Newgit."
+    }
+
+    nonisolated static func openAppSheet(_ notificationName: Notification.Name, message: String) -> String {
+        NotificationCenter.default.post(name: notificationName, object: nil)
+        return message
+    }
 }
 
 struct SavedRepositoryEntity: AppEntity, Identifiable {
@@ -1006,6 +1029,105 @@ struct MergeBranchesIntent: AppIntent {
     }
 }
 
+struct OpenRepositoryIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open Repository"
+    static var description = IntentDescription("Open a saved repository in Newgit.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Repository")
+    var repository: SavedRepositoryEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Open \(\.$repository)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            let message = try RepoIntentSupport.openRepositoryInApp(at: repository.path)
+            return .result(dialog: IntentDialog(stringLiteral: message))
+        } catch {
+            throw RepoIntentSupport.presentableError(error)
+        }
+    }
+}
+
+struct OpenRepositoryIssuesIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open Repository Issues"
+    static var description = IntentDescription("Open the issues view for a saved repository in Newgit.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Repository")
+    var repository: SavedRepositoryEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Open issues for \(\.$repository)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            let message = try RepoIntentSupport.openIssuesInApp(at: repository.path)
+            return .result(dialog: IntentDialog(stringLiteral: message))
+        } catch {
+            throw RepoIntentSupport.presentableError(error)
+        }
+    }
+}
+
+struct OpenRepositoryReleaseIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open Release View"
+    static var description = IntentDescription("Open the new release view for a saved repository in Newgit.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Repository")
+    var repository: SavedRepositoryEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Open release view for \(\.$repository)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            let message = try RepoIntentSupport.openReleaseInApp(at: repository.path)
+            return .result(dialog: IntentDialog(stringLiteral: message))
+        } catch {
+            throw RepoIntentSupport.presentableError(error)
+        }
+    }
+}
+
+struct OpenCreateNewRepositoryIntent: AppIntent {
+    static var title: LocalizedStringResource = "Create New Repository in Newgit"
+    static var description = IntentDescription("Open the create new repository view in Newgit.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let message = RepoIntentSupport.openAppSheet(.newgitIntentAddNewRepo, message: "Opening create repository view in Newgit.")
+        return .result(dialog: IntentDialog(stringLiteral: message))
+    }
+}
+
+struct OpenAddExistingRepositoryIntent: AppIntent {
+    static var title: LocalizedStringResource = "Add Existing Repository"
+    static var description = IntentDescription("Open the add existing repository view in Newgit.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let message = RepoIntentSupport.openAppSheet(.newgitIntentAddExistingRepo, message: "Opening add existing repository view in Newgit.")
+        return .result(dialog: IntentDialog(stringLiteral: message))
+    }
+}
+
+struct OpenCloneRepositoryIntent: AppIntent {
+    static var title: LocalizedStringResource = "Clone Repository"
+    static var description = IntentDescription("Open the clone repository view in Newgit.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let message = RepoIntentSupport.openAppSheet(.newgitIntentCloneRepo, message: "Opening clone repository view in Newgit.")
+        return .result(dialog: IntentDialog(stringLiteral: message))
+    }
+}
+
 struct CreateIssueIntent: AppIntent {
     static var title: LocalizedStringResource = "Create Issue"
     static var description = IntentDescription("Create a GitHub issue for a local repository.")
@@ -1158,86 +1280,97 @@ struct NewgitShortcuts: AppShortcutsProvider {
     static var shortcutTileColor: ShortcutTileColor = .blue
 
     static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: AddRepositoryIntent(),
-            phrases: [
-                "Add a repository in \(.applicationName)",
-                "Save a repository with \(.applicationName)"
-            ],
-            shortTitle: "Add Repo",
-            systemImageName: "folder.badge.plus"
-        )
-        AppShortcut(
-            intent: PushRepositoryIntent(),
-            phrases: [
-                "Push a repository with \(.applicationName)",
-                "Push repo in \(.applicationName)"
-            ],
-            shortTitle: "Push Repo",
-            systemImageName: "arrow.up.circle"
-        )
-        AppShortcut(
-            intent: PullRepositoryIntent(),
-            phrases: [
-                "Pull a repository with \(.applicationName)",
-                "Pull repo in \(.applicationName)"
-            ],
-            shortTitle: "Pull Repo",
-            systemImageName: "arrow.down.circle"
-        )
-        AppShortcut(
-            intent: CommitAndPushRepositoryIntent(),
-            phrases: [
-                "Commit and push a repository with \(.applicationName)",
-                "Commit changes in \(.applicationName)"
-            ],
-            shortTitle: "Commit & Push",
-            systemImageName: "arrow.up.circle.badge.clock"
-        )
-        AppShortcut(
-            intent: MergeBranchesIntent(),
-            phrases: [
-                "Merge branches with \(.applicationName)",
-                "Merge one branch into another in \(.applicationName)"
-            ],
-            shortTitle: "Merge Branches",
-            systemImageName: "arrow.triangle.merge"
-        )
-        AppShortcut(
-            intent: CreateIssueIntent(),
-            phrases: [
-                "Create an issue with \(.applicationName)",
-                "Make a GitHub issue in \(.applicationName)"
-            ],
-            shortTitle: "New Issue",
-            systemImageName: "exclamationmark.bubble"
-        )
-        AppShortcut(
-            intent: CreatePullRequestIntent(),
-            phrases: [
-                "Create a pull request with \(.applicationName)",
-                "Make a PR in \(.applicationName)"
-            ],
-            shortTitle: "New PR",
-            systemImageName: "arrow.triangle.pull"
-        )
-        AppShortcut(
-            intent: CheckPullRequestStatusIntent(),
-            phrases: [
-                "Check a pull request status with \(.applicationName)",
-                "Get PR status in \(.applicationName)"
-            ],
-            shortTitle: "PR Status",
-            systemImageName: "checklist"
-        )
-        AppShortcut(
-            intent: CheckIssueStatusIntent(),
-            phrases: [
-                "Check an issue status with \(.applicationName)",
-                "Get issue status in \(.applicationName)"
-            ],
-            shortTitle: "Issue Status",
-            systemImageName: "exclamationmark.circle"
-        )
+        return [
+            AppShortcut(
+                intent: OpenRepositoryIntent(),
+                phrases: [
+                    "Open a repository in \(.applicationName)",
+                    "Show a repository in \(.applicationName)"
+                ],
+                shortTitle: "Open Repo",
+                systemImageName: "folder"
+            ),
+            AppShortcut(
+                intent: OpenRepositoryIssuesIntent(),
+                phrases: [
+                    "Open issues in \(.applicationName)",
+                    "Show issues for a repository in \(.applicationName)"
+                ],
+                shortTitle: "Open Issues",
+                systemImageName: "text.bubble"
+            ),
+            AppShortcut(
+                intent: OpenRepositoryReleaseIntent(),
+                phrases: [
+                    "Open release view in \(.applicationName)",
+                    "Make a release in \(.applicationName)"
+                ],
+                shortTitle: "Open Release",
+                systemImageName: "tag"
+            ),
+            AppShortcut(
+                intent: OpenCreateNewRepositoryIntent(),
+                phrases: [
+                    "Create a new repository in \(.applicationName)",
+                    "Open new repository view in \(.applicationName)"
+                ],
+                shortTitle: "New Repo View",
+                systemImageName: "folder.badge.plus"
+            ),
+            AppShortcut(
+                intent: OpenAddExistingRepositoryIntent(),
+                phrases: [
+                    "Add an existing repository in \(.applicationName)",
+                    "Open add existing repository in \(.applicationName)"
+                ],
+                shortTitle: "Add Existing",
+                systemImageName: "plus.square.on.square"
+            ),
+            AppShortcut(
+                intent: OpenCloneRepositoryIntent(),
+                phrases: [
+                    "Clone a repository in \(.applicationName)",
+                    "Open clone repository in \(.applicationName)"
+                ],
+                shortTitle: "Clone Repo",
+                systemImageName: "square.on.square"
+            ),
+            AppShortcut(
+                intent: CreateIssueIntent(),
+                phrases: [
+                    "Create an issue with \(.applicationName)",
+                    "Make a GitHub issue in \(.applicationName)"
+                ],
+                shortTitle: "New Issue",
+                systemImageName: "exclamationmark.bubble"
+            ),
+            AppShortcut(
+                intent: CreatePullRequestIntent(),
+                phrases: [
+                    "Create a pull request with \(.applicationName)",
+                    "Make a PR in \(.applicationName)"
+                ],
+                shortTitle: "New PR",
+                systemImageName: "arrow.triangle.pull"
+            ),
+            AppShortcut(
+                intent: CheckPullRequestStatusIntent(),
+                phrases: [
+                    "Check a pull request status with \(.applicationName)",
+                    "Get PR status in \(.applicationName)"
+                ],
+                shortTitle: "PR Status",
+                systemImageName: "checklist"
+            ),
+            AppShortcut(
+                intent: CheckIssueStatusIntent(),
+                phrases: [
+                    "Check an issue status with \(.applicationName)",
+                    "Get issue status in \(.applicationName)"
+                ],
+                shortTitle: "Issue Status",
+                systemImageName: "exclamationmark.circle"
+            )
+        ]
     }
 }

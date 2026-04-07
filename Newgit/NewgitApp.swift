@@ -89,6 +89,15 @@ struct NewgitApp: App {
             .sheet(isPresented: $showCloneRepo) {
                 CloneRepoView()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitIntentAddExistingRepo)) { _ in
+                showAddRepo = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitIntentAddNewRepo)) { _ in
+                showAddNewRepo = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitIntentCloneRepo)) { _ in
+                showCloneRepo = true
+            }
         }
 
         private func reconcilePersistence(reason: String) {
