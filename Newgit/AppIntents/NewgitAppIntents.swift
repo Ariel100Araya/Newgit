@@ -370,6 +370,36 @@ private enum RepoIntentSupport {
         return try runPush(at: normalizedPath, branch: trimmedBranch)
     }
 
+    nonisolated static func mergeRepository(at path: String, sourceBranch: String, targetBranch: String) throws -> String {
+        let normalizedPath = try normalizedDirectory(at: path)
+        try ensureGitRepository(at: normalizedPath, initializeIfNeeded: false)
+
+        let trimmedSource = sourceBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTarget = targetBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSource.isEmpty else {
+            throw RepoIntentError.invalidInput("Please choose a source branch to merge from.")
+        }
+        guard !trimmedTarget.isEmpty else {
+            throw RepoIntentError.invalidInput("Please choose a target branch to merge into.")
+        }
+        guard trimmedSource != trimmedTarget else {
+            throw RepoIntentError.invalidInput("Choose two different branches to merge.")
+        }
+        guard !workingTreeHasChanges(at: normalizedPath) else {
+            throw RepoIntentError.commandFailed("Your working tree has uncommitted changes. Commit or stash them before merging.")
+        }
+
+        try checkoutBranchIfNeeded(trimmedTarget, at: normalizedPath)
+
+        let mergeResult = runCommand("cd \(shellEscape(normalizedPath)) && git merge \(shellEscape(trimmedSource))")
+        guard mergeResult.status == 0 else {
+            throw RepoIntentError.commandFailed("Merge failed: \(cleanedOutput(mergeResult.output))")
+        }
+
+        let output = cleanedOutput(mergeResult.output)
+        return output.isEmpty ? "Merged \(trimmedSource) into \(trimmedTarget)." : output
+    }
+
     nonisolated static func createIssue(at path: String, title: String, body: String) throws -> String {
         let normalizedPath = try normalizedDirectory(at: path)
         try ensureGitRepository(at: normalizedPath, initializeIfNeeded: false)
@@ -715,6 +745,34 @@ struct CommitAndPushBranchEntityQuery: EntityQuery {
     }
 }
 
+struct MergeSourceBranchEntityQuery: EntityQuery {
+    @IntentParameterDependency<MergeBranchesIntent>(\.$repository)
+    var intent
+
+    func entities(for identifiers: [SavedBranchEntity.ID]) async throws -> [SavedBranchEntity] {
+        identifiers.compactMap(RepoIntentSupport.branchEntity(for:))
+    }
+
+    func suggestedEntities() async throws -> [SavedBranchEntity] {
+        guard let repository = intent?.repository else { return [] }
+        return try RepoIntentSupport.branchEntities(at: repository.path)
+    }
+}
+
+struct MergeTargetBranchEntityQuery: EntityQuery {
+    @IntentParameterDependency<MergeBranchesIntent>(\.$repository)
+    var intent
+
+    func entities(for identifiers: [SavedBranchEntity.ID]) async throws -> [SavedBranchEntity] {
+        identifiers.compactMap(RepoIntentSupport.branchEntity(for:))
+    }
+
+    func suggestedEntities() async throws -> [SavedBranchEntity] {
+        guard let repository = intent?.repository else { return [] }
+        return try RepoIntentSupport.branchEntities(at: repository.path)
+    }
+}
+
 struct AddRepositoryIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Repository"
     static var description = IntentDescription("Save a local repository from a user-defined path.")
@@ -824,6 +882,38 @@ struct CommitAndPushRepositoryIntent: AppIntent {
                 at: repository.path,
                 branch: branch.name,
                 message: commitTitle
+            )
+            return .result(dialog: IntentDialog(stringLiteral: message))
+        } catch {
+            throw RepoIntentSupport.presentableError(error)
+        }
+    }
+}
+
+struct MergeBranchesIntent: AppIntent {
+    static var title: LocalizedStringResource = "Merge Branches"
+    static var description = IntentDescription("Merge one branch into another in a local repository.")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "Repository")
+    var repository: SavedRepositoryEntity
+
+    @Parameter(title: "Source Branch", optionsProvider: MergeSourceBranchEntityQuery())
+    var sourceBranch: SavedBranchEntity
+
+    @Parameter(title: "Target Branch", optionsProvider: MergeTargetBranchEntityQuery())
+    var targetBranch: SavedBranchEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Merge \(\.$sourceBranch) into \(\.$targetBranch) for \(\.$repository)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            let message = try RepoIntentSupport.mergeRepository(
+                at: repository.path,
+                sourceBranch: sourceBranch.name,
+                targetBranch: targetBranch.name
             )
             return .result(dialog: IntentDialog(stringLiteral: message))
         } catch {
@@ -990,6 +1080,15 @@ struct NewgitShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Commit & Push",
             systemImageName: "arrow.up.circle.badge.clock"
+        )
+        AppShortcut(
+            intent: MergeBranchesIntent(),
+            phrases: [
+                "Merge branches with \(.applicationName)",
+                "Merge one branch into another in \(.applicationName)"
+            ],
+            shortTitle: "Merge Branches",
+            systemImageName: "arrow.triangle.merge"
         )
         AppShortcut(
             intent: CreateIssueIntent(),
