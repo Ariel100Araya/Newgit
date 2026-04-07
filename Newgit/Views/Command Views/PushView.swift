@@ -134,6 +134,57 @@ struct PushView: View {
          return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
      }
 
+     private func parseLocalAndRemoteCounts(from output: String) -> (localOnly: Int, remoteOnly: Int)? {
+         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+         let parts = trimmed.components(separatedBy: CharacterSet.whitespacesAndNewlines).filter { !$0.isEmpty }
+         if parts.count >= 2, let localOnly = Int(parts[0]), let remoteOnly = Int(parts[1]) {
+             return (localOnly, remoteOnly)
+         }
+         return nil
+     }
+
+     private func currentBranchName(in escapedDirectory: String) -> (name: String?, output: String, status: Int32) {
+         let branchCmd = "cd \(escapedDirectory) && git rev-parse --abbrev-ref HEAD"
+         let branchRes = runCommand(branchCmd)
+         let combined = "$ \(branchCmd)\n" + branchRes.output + "\nexit=\(branchRes.status)\n\n"
+         let name = branchRes.status == 0
+             ? branchRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+             : nil
+         return (name, combined, branchRes.status)
+     }
+
+     private func checkIfPullNeeded(in escapedDirectory: String) -> (needsPull: Bool, output: String, status: Int32) {
+         var combined = ""
+
+         let upstreamCmd = "cd \(escapedDirectory) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
+         let upstreamRes = runCommand(upstreamCmd)
+         combined += "$ \(upstreamCmd)\n" + upstreamRes.output + "\nexit=\(upstreamRes.status)\n\n"
+         if upstreamRes.status != 0 {
+             return (false, combined, 0)
+         }
+
+         let fetchCmd = "cd \(escapedDirectory) && git fetch"
+         let fetchRes = runCommand(fetchCmd)
+         combined += "$ \(fetchCmd)\n" + fetchRes.output + "\nexit=\(fetchRes.status)\n\n"
+         if fetchRes.status != 0 {
+             return (false, combined, fetchRes.status)
+         }
+
+         let compareCmd = "cd \(escapedDirectory) && git rev-list --count --left-right HEAD...@{u} 2>/dev/null"
+         let compareRes = runCommand(compareCmd)
+         combined += "$ \(compareCmd)\n" + compareRes.output + "\nexit=\(compareRes.status)\n\n"
+         guard compareRes.status == 0 else {
+             return (false, combined, compareRes.status)
+         }
+
+         let counts = parseLocalAndRemoteCounts(from: compareRes.output) ?? (localOnly: 0, remoteOnly: 0)
+         let needsPull = counts.remoteOnly > 0
+         if needsPull {
+             combined += "Remote is ahead by \(counts.remoteOnly) commit(s). Pull is required before pushing.\n\n"
+         }
+         return (needsPull, combined, 0)
+     }
+
      private func performPush() {
          guard !isProcessing else { return }
          isProcessing = true
@@ -193,8 +244,57 @@ struct PushView: View {
                  }
              }
 
+         let pullCheck = checkIfPullNeeded(in: dir)
+         combined += pullCheck.output
+         if pullCheck.status != 0 {
+             let short = pullCheck.output.split(separator: "\n").last.map(String.init) ?? "Could not verify remote branch state"
+             DispatchQueue.main.async {
+                     self.commandOutput = combined
+                     self.showCommandOutput = true
+                     self.errorSummary = "Pre-push check failed: \(short)"
+                     self.showErrorAlert = true
+                     self.isProcessing = false
+                     self.showSuccessView = false
+                 }
+                 return
+             }
+             if pullCheck.needsPull {
+                 DispatchQueue.main.async {
+                     self.commandOutput = combined
+                     self.showCommandOutput = true
+                     self.errorSummary = "Remote has new commits. Pull before pushing this branch."
+                     self.showErrorAlert = true
+                     self.isProcessing = false
+                     self.showSuccessView = false
+                 }
+                 return
+             }
+
+             let upstreamCheckCmd = "cd \(dir) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
+             let upstreamCheckRes = runCommand(upstreamCheckCmd)
+             combined += "$ \(upstreamCheckCmd)\n" + upstreamCheckRes.output + "\nexit=\(upstreamCheckRes.status)\n\n"
+
+             let pushCmd: String
+             if upstreamCheckRes.status == 0 {
+                 pushCmd = "cd \(dir) && git push"
+             } else {
+                 let branchInfo = currentBranchName(in: dir)
+                 combined += branchInfo.output
+                 guard branchInfo.status == 0, let branchName = branchInfo.name, !branchName.isEmpty else {
+                     DispatchQueue.main.async {
+                         self.commandOutput = combined
+                         self.showCommandOutput = true
+                         self.errorSummary = "Push failed: could not determine the current branch name."
+                         self.showErrorAlert = true
+                         self.isProcessing = false
+                         self.showSuccessView = false
+                     }
+                     return
+                 }
+                 pushCmd = "cd \(dir) && git push --set-upstream origin \(shellEscape(branchName))"
+             }
+
              // git push
-             let pushCmd = "cd \(dir) && git push"
              let pushRes = runCommand(pushCmd)
              combined += "$ \(pushCmd)\n" + pushRes.output + "\nexit=\(pushRes.status)\n\n"
 

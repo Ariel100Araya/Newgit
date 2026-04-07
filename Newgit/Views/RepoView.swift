@@ -518,6 +518,14 @@ struct RepoView: View {
                     updatePushAvailability()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitOpenIssuesInSelectedRepo)) { notification in
+                guard let path = notification.object as? String, path == projectDirectory else { return }
+                showIssuesLink = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitOpenReleaseInSelectedRepo)) { notification in
+                guard let path = notification.object as? String, path == projectDirectory else { return }
+                showReleaseLink = true
+            }
         }
     }
     

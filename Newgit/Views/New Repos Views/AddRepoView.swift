@@ -81,10 +81,18 @@ struct AddRepoView: View {
                     .padding(.vertical, 4)
                 }
                 .onDelete { indices in
+                    let deletedIDs = Set(indices.map { savedRepos[$0].id })
                     for index in indices {
                         let repo = savedRepos[index]
                         modelContext.delete(repo)
                         print("AddRepoView: deleted repo id=\(repo.id)")
+                    }
+                    do {
+                        try modelContext.save()
+                        SavedRepoBackupStore.shared.sync(repos: savedRepos.filter { !deletedIDs.contains($0.id) })
+                    } catch {
+                        saveMessage = "Delete failed: \(error.localizedDescription)"
+                        showSaveAlert = true
                     }
                 }
             }
@@ -139,6 +147,7 @@ struct AddRepoView: View {
     
     // Add Repo
     private func addRepo() {
+        showInitConfirm = false
         let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         // Save-time sanitizer: trim leading/trailing hyphens
         let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
@@ -158,14 +167,14 @@ struct AddRepoView: View {
 
         // If it's already a git repo, save normally
         if isGitRepository(trimmedPath) {
+            clearPendingInitializationState()
             let repo = SavedRepo(name: sanitizedTitle, path: trimmedPath)
             modelContext.insert(repo)
             print("AddRepoView: inserted repo \(sanitizedTitle) id=\(repo.id)")
             do {
                 try modelContext.save()
-                saveMessage = "Saved \(sanitizedTitle)"
+                SavedRepoBackupStore.shared.sync(repos: savedRepos + [repo])
                 print("AddRepoView: modelContext.save() succeeded. savedRepos count = \(savedRepos.count)")
-                showSaveAlert = true
                 // Clear inputs after adding and dismiss only on successful save
                 projectTitle = ""
                 projectDirectory = ""
@@ -181,7 +190,6 @@ struct AddRepoView: View {
         // Git is available but folder isn't a repo: offer to initialize
         pendingInitPath = trimmedPath
         pendingInitTitle = sanitizedTitle
-        saveMessage = "The specified directory is not a git repository."
         showInitConfirm = true
     }
 
@@ -193,6 +201,7 @@ struct AddRepoView: View {
 
     // Initialize a git repository at the given path, then save the repo entry on success
     private func initializeRepo(path: String, title: String) {
+        showInitConfirm = false
         // Ensure path exists and is a directory
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
@@ -209,9 +218,11 @@ struct AddRepoView: View {
             modelContext.insert(repo)
             do {
                 try modelContext.save()
+                SavedRepoBackupStore.shared.sync(repos: savedRepos + [repo])
                 saveMessage = "Initialized and saved \(title)"
                 print("AddRepoView: git init succeeded and saved repo \(title)")
                 showSaveAlert = true
+                clearPendingInitializationState()
                 projectTitle = ""
                 projectDirectory = ""
                 dismiss()
@@ -248,6 +259,12 @@ struct AddRepoView: View {
     // Helper: safely quote a path for use in shell commands
     private func shellEscape(_ s: String) -> String {
         return "'" + s.replacingOccurrences(of: "'", with: "'\\'\''") + "'"
+    }
+
+    private func clearPendingInitializationState() {
+        pendingInitPath = ""
+        pendingInitTitle = ""
+        showInitConfirm = false
     }
 
     // Helper: determine whether a path is a git repository. Fast path checks for a .git folder, otherwise falls back to `git rev-parse`.

@@ -22,6 +22,13 @@ struct ContentView: View {
     @State private var showDeleteResultAlert: Bool = false
     @State private var debugSelectedName: String = ""
 
+    private enum PendingNavigation {
+        case issues(String)
+        case release(String)
+    }
+
+    @State private var pendingNavigation: PendingNavigation? = nil
+
     var body: some View {
         // Build the split view into a local variable to reduce expression complexity for the compiler
         let nav = NavigationSplitView {
@@ -46,6 +53,7 @@ struct ContentView: View {
             print("selectionID changed from \(old?.uuidString ?? "nil") to \(new?.uuidString ?? "nil")")
             if let id = new, let r = savedRepos.first(where: { $0.id == id }) {
                 print("resolved to repo: \(r.name) (id: \(r.id))")
+                handlePendingNavigation(for: r.path)
             } else {
                 print("selection did not resolve to a repo")
             }
@@ -118,6 +126,26 @@ struct ContentView: View {
         anyView = AnyView(anyView.onChange(of: selectionID) { old, new in
             if let id = new, let repo = savedRepos.first(where: { $0.id == id }) {
                 debugSelectedName = repo.name
+            }
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenRepository)) { notification in
+            guard let path = notification.object as? String else { return }
+            openRepository(at: path)
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenIssues)) { notification in
+            guard let path = notification.object as? String else { return }
+            openRepository(at: path)
+            pendingNavigation = .issues(path)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NotificationCenter.default.post(name: .newgitOpenIssuesInSelectedRepo, object: path)
+            }
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenRelease)) { notification in
+            guard let path = notification.object as? String else { return }
+            openRepository(at: path)
+            pendingNavigation = .release(path)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NotificationCenter.default.post(name: .newgitOpenReleaseInSelectedRepo, object: path)
             }
         })
 
@@ -206,6 +234,7 @@ struct ContentView: View {
         modelContext.delete(repo)
         do {
             try modelContext.save()
+            SavedRepoBackupStore.shared.sync(repos: savedRepos.filter { $0.id != repo.id })
             deleteResultMessage = "Deleted \(repo.name)"
             print("ContentView: modelContext.save() succeeded")
         } catch {
@@ -214,6 +243,26 @@ struct ContentView: View {
         }
         showDeleteResultAlert = true
         repoToDelete = nil
+    }
+
+    private func openRepository(at path: String) {
+        guard let repo = savedRepos.first(where: { $0.path == path }) else { return }
+        selectionID = repo.id
+        debugSelectedName = repo.name
+    }
+
+    private func handlePendingNavigation(for path: String) {
+        guard let pendingNavigation else { return }
+        switch pendingNavigation {
+        case .issues(let pendingPath) where pendingPath == path:
+            NotificationCenter.default.post(name: .newgitOpenIssuesInSelectedRepo, object: path)
+            self.pendingNavigation = nil
+        case .release(let pendingPath) where pendingPath == path:
+            NotificationCenter.default.post(name: .newgitOpenReleaseInSelectedRepo, object: path)
+            self.pendingNavigation = nil
+        default:
+            break
+        }
     }
 }
 
