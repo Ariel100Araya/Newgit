@@ -16,6 +16,8 @@ struct RepoView: View {
     @State private var showCommandOutput: Bool = false
     @State private var gitPush: Bool =  false
     @State private var showPush: Bool = false
+    @State private var repoStatus: RepoStatusSnapshot? = nil
+    @State private var isLoadingRepoStatus: Bool = false
     
     // New state to drive selectable list + selected diff
     @State private var changedFiles: [String] = []
@@ -50,6 +52,8 @@ struct RepoView: View {
     
     // Navigation state for the Issues screen
     @State private var showIssuesLink: Bool = false
+    // Navigation state for the Insights screen
+    @State private var showInsightsLink: Bool = false
     // Navigation state for the Pull Requests screen
     @State private var showPullRequestsLink: Bool = false
     // Navigation state for the Add Release screen
@@ -59,6 +63,9 @@ struct RepoView: View {
         // Use a NavigationStack so we can push the IssuesView onto the navigation stack instead of presenting a sheet
         NavigationStack {
             VStack {
+                urgentInsightsBanner()
+                    .padding([.horizontal, .top])
+
                 HStack {
                     // Left pane: selectable list of changed files
                     VStack { // Removed ScrollView to avoid embedding List inside a ScrollView which can collapse the list
@@ -226,6 +233,9 @@ struct RepoView: View {
                         Button("Pull") { performPull() }
                         Button("Push") { showPush = true }
                             .disabled(!canPush)
+                        Button("Insights") {
+                            showInsightsLink = true
+                        }
                         Button("Stash Changes...") {
                             stashMessage = ""
                             stashIncludeUntracked = true
@@ -500,6 +510,9 @@ struct RepoView: View {
             .navigationDestination(isPresented: $showIssuesLink) {
                 IssuesView(projectDirectory: projectDirectory)
             }
+            .navigationDestination(isPresented: $showInsightsLink) {
+                insightsDestinationView()
+            }
             .navigationDestination(isPresented: $showPullRequestsLink) {
                 PullRequestsView(projectDirectory: projectDirectory)
             }
@@ -510,6 +523,7 @@ struct RepoView: View {
                 DispatchQueue.global(qos: .userInitiated).async {
                     loadChangedFiles()
                     loadBranches()
+                    loadRepoStatus()
                     // recompute push availability after we've loaded state
                     DispatchQueue.global(qos: .utility).async {
                         updatePushAvailability()
@@ -924,6 +938,18 @@ struct RepoView: View {
             }
         }
     }
+
+    private func loadRepoStatus() {
+        DispatchQueue.main.async {
+            self.isLoadingRepoStatus = true
+        }
+
+        let snapshot = RepoStatusEngine.load(projectDirectory: projectDirectory)
+        DispatchQueue.main.async {
+            self.repoStatus = snapshot
+            self.isLoadingRepoStatus = false
+        }
+    }
     
     private func performStash(message: String, includeUntracked: Bool) {
         DispatchQueue.global(qos: .userInitiated).async {
@@ -968,18 +994,21 @@ struct RepoView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             loadChangedFiles()
             loadBranches()
+            loadRepoStatus()
         }
         
         // Retry after a short delay to handle async state changes on disk or background hooks
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.0) {
             loadChangedFiles()
             loadBranches()
+            loadRepoStatus()
         }
         
         // One more retry slightly later
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3.0) {
             loadChangedFiles()
             loadBranches()
+            loadRepoStatus()
         }
     }
     
@@ -1267,5 +1296,165 @@ struct RepoView: View {
                 .buttonStyle(.borderless)
             }
         }
+    }
+
+    @ViewBuilder
+    private func urgentInsightsBanner() -> some View {
+        if let repoStatus, shouldShowInlineInsights(for: repoStatus) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Insights")
+                            .font(.headline)
+                    }
+
+                    Spacer()
+
+                    Button("Open Insights") {
+                        showInsightsLink = true
+                    }
+                }
+
+                ForEach(highPriorityInsights(for: repoStatus)) { insight in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: iconName(for: insight.severity))
+                            .foregroundStyle(color(for: insight.severity))
+                            .frame(width: 18)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(insight.title)
+                                .font(.subheadline)
+                                .bold()
+                            Text(insight.detail)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private func insightsDestinationView() -> some View {
+        repoInsightsView()
+            .navigationTitle("Insights")
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    if isLoadingRepoStatus {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button {
+                            DispatchQueue.global(qos: .userInitiated).async {
+                                loadRepoStatus()
+                            }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .help("Refresh repo insights")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    if let pr = repoStatus?.associatedPullRequest,
+                       let url = URL(string: pr.url),
+                       !pr.url.isEmpty {
+                        Button("Open PR #\(pr.number)") {
+                            NSWorkspace.shared.open(url)
+                        }
+                        .help("Open pull request #\(pr.number)")
+                    }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private func repoInsightsView() -> some View {
+        if let repoStatus {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(repoStatus.insights) { insight in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: iconName(for: insight.severity))
+                                .foregroundStyle(color(for: insight.severity))
+                                .frame(width: 18)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(insight.title)
+                                    .font(.subheadline)
+                                    .bold()
+                                Text(insight.detail)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else if isLoadingRepoStatus {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking repo insights...")
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+
+    private func iconName(for severity: RepoInsight.Severity) -> String {
+        switch severity {
+        case .info:
+            return "lightbulb"
+        case .warning:
+            return "exclamationmark.triangle"
+        case .critical:
+            return "xmark.octagon"
+        }
+    }
+
+    private func color(for severity: RepoInsight.Severity) -> Color {
+        switch severity {
+        case .info:
+            return .blue
+        case .warning:
+            return .orange
+        case .critical:
+            return .red
+        }
+    }
+
+    private func repoStatusMetadata(_ status: RepoStatusSnapshot) -> String {
+        var metadata: [String] = []
+        metadata.append("Branch: \(status.currentBranch)")
+        if let upstream = status.upstreamBranch {
+            metadata.append("Upstream: \(upstream)")
+        } else if !status.isDetachedHead {
+            metadata.append("Upstream: none")
+        }
+        if status.stashCount > 0 {
+            metadata.append("Stashes: \(status.stashCount)")
+        }
+        return metadata.joined(separator: " • ")
+    }
+
+    private func highPriorityInsights(for status: RepoStatusSnapshot) -> [RepoInsight] {
+        let criticalInsights = status.insights.filter { $0.severity == .critical }
+        if status.branchLooksDeletedAfterPR {
+            let branchInsights = status.insights.filter { $0.title == "Branch may have been deleted by a PR" }
+            return criticalInsights + branchInsights
+        }
+        return criticalInsights
+    }
+
+    private func shouldShowInlineInsights(for status: RepoStatusSnapshot) -> Bool {
+        !highPriorityInsights(for: status).isEmpty
     }
 }
