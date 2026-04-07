@@ -1,4 +1,10 @@
-// this is a test of something cool
+//
+//  NewgitAppIntents.swift
+//  Newgit
+//
+//  Created by Ariel Araya-Madrigal on 12/6/25.
+//
+
 import AppIntents
 import Foundation
 
@@ -400,6 +406,35 @@ private enum RepoIntentSupport {
         return output.isEmpty ? "Merged \(trimmedSource) into \(trimmedTarget)." : output
     }
 
+    nonisolated static func commitRepository(at path: String, branch: String, message: String) throws -> String {
+        let normalizedPath = try normalizedDirectory(at: path)
+        try ensureGitRepository(at: normalizedPath, initializeIfNeeded: false)
+
+        let trimmedBranch = branch.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedBranch.isEmpty else {
+            throw RepoIntentError.invalidInput("Please choose a branch to commit on.")
+        }
+        guard !trimmedMessage.isEmpty else {
+            throw RepoIntentError.invalidInput("Please provide a commit title.")
+        }
+
+        try checkoutBranchIfNeeded(trimmedBranch, at: normalizedPath)
+
+        let addResult = runCommand("cd \(shellEscape(normalizedPath)) && git add .")
+        guard addResult.status == 0 else {
+            throw RepoIntentError.commandFailed("git add failed: \(cleanedOutput(addResult.output))")
+        }
+
+        let commitResult = runCommand("cd \(shellEscape(normalizedPath)) && git commit -m \(shellEscape(trimmedMessage))")
+        guard commitResult.status == 0 else {
+            throw RepoIntentError.commandFailed("Commit failed: \(cleanedOutput(commitResult.output))")
+        }
+
+        let output = cleanedOutput(commitResult.output)
+        return output.isEmpty ? "Committed changes on \(trimmedBranch)." : output
+    }
+
     nonisolated static func createIssue(at path: String, title: String, body: String) throws -> String {
         let normalizedPath = try normalizedDirectory(at: path)
         try ensureGitRepository(at: normalizedPath, initializeIfNeeded: false)
@@ -418,13 +453,18 @@ private enum RepoIntentSupport {
         return cleanedOutput(result.output)
     }
 
-    nonisolated static func createPullRequest(at path: String, title: String, body: String, baseBranch: String) throws -> String {
+    nonisolated static func createPullRequest(at path: String, sourceBranch: String, title: String, subtitle: String, baseBranch: String) throws -> String {
         let normalizedPath = try normalizedDirectory(at: path)
         try ensureGitRepository(at: normalizedPath, initializeIfNeeded: false)
         try ensureGHAuthenticated()
 
+        let trimmedSource = sourceBranch.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedBase = baseBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSubtitle = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSource.isEmpty else {
+            throw RepoIntentError.invalidInput("Please choose a source branch.")
+        }
         guard !trimmedTitle.isEmpty else {
             throw RepoIntentError.invalidInput("Please provide a pull request title.")
         }
@@ -432,8 +472,12 @@ private enum RepoIntentSupport {
             throw RepoIntentError.invalidInput("Please provide a base branch.")
         }
 
-        _ = try pushRepository(at: normalizedPath, branch: try currentBranch(at: normalizedPath))
-        let result = runGHCommand(["pr", "create", "--title", trimmedTitle, "--body", body, "--base", trimmedBase], currentDirectory: normalizedPath)
+        try checkoutBranchIfNeeded(trimmedSource, at: normalizedPath)
+        _ = try pushRepository(at: normalizedPath, branch: trimmedSource)
+        let result = runGHCommand(
+            ["pr", "create", "--title", trimmedTitle, "--body", trimmedSubtitle, "--base", trimmedBase],
+            currentDirectory: normalizedPath
+        )
         guard result.status == 0 else {
             throw RepoIntentError.commandFailed("Pull request creation failed: \(cleanedOutput(result.output))")
         }
@@ -745,6 +789,20 @@ struct CommitAndPushBranchEntityQuery: EntityQuery {
     }
 }
 
+struct CreatePullRequestBranchEntityQuery: EntityQuery {
+    @IntentParameterDependency<CreatePullRequestIntent>(\.$repository)
+    var intent
+
+    func entities(for identifiers: [SavedBranchEntity.ID]) async throws -> [SavedBranchEntity] {
+        identifiers.compactMap(RepoIntentSupport.branchEntity(for:))
+    }
+
+    func suggestedEntities() async throws -> [SavedBranchEntity] {
+        guard let repository = intent?.repository else { return [] }
+        return try RepoIntentSupport.branchEntities(at: repository.path)
+    }
+}
+
 struct MergeSourceBranchEntityQuery: EntityQuery {
     @IntentParameterDependency<MergeBranchesIntent>(\.$repository)
     var intent
@@ -904,12 +962,38 @@ struct MergeBranchesIntent: AppIntent {
     @Parameter(title: "Target Branch", optionsProvider: MergeTargetBranchEntityQuery())
     var targetBranch: SavedBranchEntity
 
+    @Parameter(title: "Commit Changes First", default: false)
+    var commitChangesFirst: Bool
+
+    @Parameter(title: "Commit Title")
+    var commitTitle: String?
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Merge \(\.$sourceBranch) into \(\.$targetBranch) for \(\.$repository)")
+        Summary("Merge \(\.$sourceBranch) into \(\.$targetBranch) for \(\.$repository)") {
+            \.$commitChangesFirst
+        }
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
+            if RepoIntentSupport.workingTreeHasChanges(at: repository.path) {
+                let resolvedCommitTitle = commitTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let shouldCommit = commitChangesFirst || !resolvedCommitTitle.isEmpty
+                guard shouldCommit else {
+                    throw RepoIntentError.commandFailed("This repository has uncommitted changes. Turn on Commit Changes First or provide a Commit Title before merging.")
+                }
+
+                guard !resolvedCommitTitle.isEmpty else {
+                    throw RepoIntentError.invalidInput("Please provide a Commit Title before merging with uncommitted changes.")
+                }
+
+                _ = try RepoIntentSupport.commitRepository(
+                    at: repository.path,
+                    branch: targetBranch.name,
+                    message: resolvedCommitTitle
+                )
+            }
+
             let message = try RepoIntentSupport.mergeRepository(
                 at: repository.path,
                 sourceBranch: sourceBranch.name,
@@ -954,34 +1038,63 @@ struct CreateIssueIntent: AppIntent {
 
 struct CreatePullRequestIntent: AppIntent {
     static var title: LocalizedStringResource = "Create Pull Request"
-    static var description = IntentDescription("Create a GitHub pull request for the current branch.")
+    static var description = IntentDescription("Create a GitHub pull request for a selected branch.")
     static var openAppWhenRun = false
 
     @Parameter(title: "Repository")
     var repository: SavedRepositoryEntity
 
+    @Parameter(title: "Source Branch", optionsProvider: CreatePullRequestBranchEntityQuery())
+    var sourceBranch: SavedBranchEntity
+
     @Parameter(title: "Pull Request Title")
     var pullRequestTitle: String
 
-    @Parameter(title: "Pull Request Body")
-    var pullRequestBody: String
+    @Parameter(title: "Pull Request Subtitle")
+    var pullRequestSubtitle: String
 
     @Parameter(title: "Base Branch", default: "main")
     var baseBranch: String
 
+    @Parameter(title: "Commit Changes First", default: false)
+    var commitChangesFirst: Bool
+
+    @Parameter(title: "Commit Title")
+    var commitTitle: String?
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Create pull request \(\.$pullRequestTitle) for \(\.$repository)") {
+        Summary("Create pull request \(\.$pullRequestTitle) from \(\.$sourceBranch) for \(\.$repository)") {
             \.$baseBranch
-            \.$pullRequestBody
+            \.$pullRequestSubtitle
+            \.$commitChangesFirst
         }
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
+            if RepoIntentSupport.workingTreeHasChanges(at: repository.path) {
+                let resolvedCommitTitle = commitTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let shouldCommit = commitChangesFirst || !resolvedCommitTitle.isEmpty
+                guard shouldCommit else {
+                    throw RepoIntentError.commandFailed("This branch has uncommitted changes. Turn on Commit Changes First or provide a Commit Title before making the pull request.")
+                }
+
+                guard !resolvedCommitTitle.isEmpty else {
+                    throw RepoIntentError.invalidInput("Please provide a Commit Title before creating the pull request with uncommitted changes.")
+                }
+
+                _ = try RepoIntentSupport.commitRepository(
+                    at: repository.path,
+                    branch: sourceBranch.name,
+                    message: resolvedCommitTitle
+                )
+            }
+
             let message = try RepoIntentSupport.createPullRequest(
                 at: repository.path,
+                sourceBranch: sourceBranch.name,
                 title: pullRequestTitle,
-                body: pullRequestBody,
+                subtitle: pullRequestSubtitle,
                 baseBranch: baseBranch
             )
             return .result(dialog: IntentDialog(stringLiteral: message))
