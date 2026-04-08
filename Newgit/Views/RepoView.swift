@@ -1329,6 +1329,16 @@ struct RepoView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
+
+                        Spacer(minLength: 12)
+
+                        if shouldShowPullButton(for: insight, status: repoStatus) {
+                            Button("Pull") {
+                                performPull()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
                     }
                 }
             }
@@ -1447,14 +1457,31 @@ struct RepoView: View {
 
     private func highPriorityInsights(for status: RepoStatusSnapshot) -> [RepoInsight] {
         let criticalInsights = status.insights.filter { $0.severity == .critical }
+        let remoteChangeInsights = status.insights.filter { $0.title == "Remote has new commits" }
         if status.branchLooksDeletedAfterPR {
             let branchInsights = status.insights.filter { $0.title == "Branch may have been deleted by a PR" }
-            return criticalInsights + branchInsights
+            return deduplicatedInsights(criticalInsights + branchInsights + remoteChangeInsights)
         }
-        return criticalInsights
+        return deduplicatedInsights(criticalInsights + remoteChangeInsights)
     }
 
     private func shouldShowInlineInsights(for status: RepoStatusSnapshot) -> Bool {
         !highPriorityInsights(for: status).isEmpty
+    }
+
+    private func shouldShowPullButton(for insight: RepoInsight, status: RepoStatusSnapshot) -> Bool {
+        insight.title == "Remote has new commits" && status.behindCount > 0
+    }
+
+    private func deduplicatedInsights(_ insights: [RepoInsight]) -> [RepoInsight] {
+        var seen: Set<String> = []
+        return insights.filter { insight in
+            let key = "\(insight.severity.rawValue)|\(insight.title)|\(insight.detail)"
+            if seen.contains(key) {
+                return false
+            }
+            seen.insert(key)
+            return true
+        }
     }
 }
