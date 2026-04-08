@@ -14,6 +14,13 @@ struct SavedRepoSnapshot: Codable {
     let path: String
     let lastUpdated: Date
 
+    init(id: UUID = UUID(), name: String, path: String, lastUpdated: Date = Date()) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.lastUpdated = lastUpdated
+    }
+
     init(repo: SavedRepo) {
         self.id = repo.id
         self.name = repo.name
@@ -53,11 +60,6 @@ final class SavedRepoBackupStore {
     }
 
     func restoreIfNeeded(into modelContext: ModelContext, currentRepos: [SavedRepo]) -> SavedRepoRestoreResult {
-        guard currentRepos.isEmpty else {
-            sync(repos: currentRepos)
-            return .noBackup
-        }
-
         let snapshots: [SavedRepoSnapshot]
         do {
             snapshots = try loadSnapshots()
@@ -65,12 +67,25 @@ final class SavedRepoBackupStore {
             return .failed(error)
         }
 
-        guard !snapshots.isEmpty else {
-            return .backupAlreadyEmpty
+        let uniqueSnapshots = deduplicatedSnapshots(from: snapshots)
+
+        guard !uniqueSnapshots.isEmpty else {
+            if currentRepos.isEmpty {
+                return .backupAlreadyEmpty
+            }
+            sync(repos: currentRepos)
+            return .noBackup
         }
 
-        let uniqueSnapshots = deduplicatedSnapshots(from: snapshots)
-        for snapshot in uniqueSnapshots {
+        let currentRepoPaths = Set(currentRepos.map { normalizedPath($0.path) })
+        let snapshotsToInsert = uniqueSnapshots.filter { !currentRepoPaths.contains(normalizedPath($0.path)) }
+
+        guard !snapshotsToInsert.isEmpty else {
+            sync(repos: currentRepos)
+            return .noBackup
+        }
+
+        for snapshot in snapshotsToInsert {
             modelContext.insert(
                 SavedRepo(
                     id: snapshot.id,
@@ -83,11 +98,25 @@ final class SavedRepoBackupStore {
 
         do {
             try modelContext.save()
-            syncSnapshots(uniqueSnapshots)
-            return .restored(uniqueSnapshots.count)
+            syncSnapshots(deduplicatedSnapshots(from: currentRepos.map(SavedRepoSnapshot.init) + snapshotsToInsert))
+            return .restored(snapshotsToInsert.count)
         } catch {
             return .failed(error)
         }
+    }
+
+    func upsert(snapshot: SavedRepoSnapshot) {
+        var snapshots = (try? loadSnapshots()) ?? []
+        let normalizedSnapshotPath = normalizedPath(snapshot.path)
+        snapshots.removeAll { existing in
+            existing.id == snapshot.id || normalizedPath(existing.path) == normalizedSnapshotPath
+        }
+        snapshots.append(snapshot)
+        syncSnapshots(snapshots)
+    }
+
+    func savedSnapshots() -> [SavedRepoSnapshot] {
+        deduplicatedSnapshots(from: (try? loadSnapshots()) ?? [])
     }
 
     private func syncSnapshots(_ snapshots: [SavedRepoSnapshot]) {
@@ -116,12 +145,16 @@ final class SavedRepoBackupStore {
         var uniqueSnapshots: [SavedRepoSnapshot] = []
 
         for snapshot in snapshots {
-            let normalizedPath = URL(fileURLWithPath: snapshot.path).standardizedFileURL.path.lowercased()
+            let normalizedSnapshotPath = normalizedPath(snapshot.path)
             guard seenIDs.insert(snapshot.id).inserted else { continue }
-            guard seenPaths.insert(normalizedPath).inserted else { continue }
+            guard seenPaths.insert(normalizedSnapshotPath).inserted else { continue }
             uniqueSnapshots.append(snapshot)
         }
 
         return uniqueSnapshots.sorted { $0.lastUpdated > $1.lastUpdated }
+    }
+
+    private func normalizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.path.lowercased()
     }
 }

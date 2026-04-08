@@ -46,6 +46,7 @@ struct NewgitApp: App {
         @State private var showAddNewRepo: Bool = false
         @State private var showCloneRepo: Bool = false
         @State private var isReconcilingPersistence: Bool = false
+        @State private var pendingAddRepoPath: String? = nil
 
         var body: some View {
             Group {
@@ -79,15 +80,28 @@ struct NewgitApp: App {
                     reconcilePersistence(reason: "scene became active")
                 }
             }
+            .onOpenURL { url in
+                handleIncomingURL(url)
+            }
             // Present the sheets from the RootView so dismissal is handled consistently when the root view switches.
             .sheet(isPresented: $showAddRepo) {
-                AddRepoView()
+                AddRepoView(initialDirectory: pendingAddRepoPath)
             }
             .sheet(isPresented: $showAddNewRepo) {
                 AddNewRepoView()
             }
             .sheet(isPresented: $showCloneRepo) {
                 CloneRepoView()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitIntentAddExistingRepo)) { _ in
+                pendingAddRepoPath = nil
+                showAddRepo = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitIntentAddNewRepo)) { _ in
+                showAddNewRepo = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newgitIntentCloneRepo)) { _ in
+                showCloneRepo = true
             }
         }
 
@@ -107,6 +121,19 @@ struct NewgitApp: App {
             case .failed(let error):
                 print("RootView persistence check (\(reason)) failed: \(error)")
             }
+        }
+
+        private func handleIncomingURL(_ url: URL) {
+            guard url.scheme == "newgit" else { return }
+            guard url.host == "add-repository" else { return }
+
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let path = components?.queryItems?.first(where: { $0.name == "path" })?.value
+
+            print("RootView incoming URL path = \(path ?? "nil")")
+
+            pendingAddRepoPath = path
+            showAddRepo = true
         }
     }
 }
