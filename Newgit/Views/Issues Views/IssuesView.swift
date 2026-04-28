@@ -120,6 +120,12 @@ struct IssuesView: View {
                     newIssueBody = ""
                 }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .newgitCreateIssueInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            activeSheet = .createIssue
+            showAddIssueSheet = true
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
     
     // MARK: - Networking / actions

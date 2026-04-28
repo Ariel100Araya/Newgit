@@ -43,7 +43,7 @@ struct CloneRepoView: View {
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
-                Text("Select repo from menu to clone from GitHub")
+                Text("Select a GitHub repo or paste a clone link")
                 Spacer()
                 Button("Refresh") {
                     loadGHRepos()
@@ -112,18 +112,31 @@ struct CloneRepoView: View {
                 .padding(.leading, 6)
             }
             Text("Enter a title")
-            TextField("Enter a title", text: Binding(get: { projectTitle }, set: { new in
-                // Typing sanitizer: convert whitespace to hyphens immediately so pressing Space inserts '-'
-                projectTitle = sanitizeProjectNameForTyping(new)
-            }))
+            TextField("Enter a title", text: $projectTitle)
+            .onChange(of: projectTitle) { _, newValue in
+                let sanitized = RepoNameSanitizer.forTyping(newValue)
+                if sanitized != newValue {
+                    projectTitle = sanitized
+                }
+            }
             .padding(.bottom)
 
-            // From the SSH flag! Allow user to edit the clone link (populated from selection)
-            /*
-            Text("Repo link (SSH)")
-            TextField(useHTTPS ? "https://github.com/owner/repo.git" : "git@github.com:owner/repo.git", text: $projectLink)
+            Text("Repository link")
+            TextField("https://github.com/owner/repo or git@github.com:owner/repo.git", text: Binding(get: { projectLink }, set: { new in
+                projectLink = new
+                if selectedGHRepo != nil {
+                    selectedGHRepo = nil
+                }
+                autofillTitleFromLinkIfNeeded()
+            }))
+            .textFieldStyle(.roundedBorder)
+            .padding(.bottom, 6)
+
+            Text("Paste a GitHub HTTPS or SSH URL and Newgit will run the equivalent of `git clone <url>`.")
+                .font(.caption)
+                .foregroundColor(.secondary)
                 .padding(.bottom)
-            */
+
             // Clone controls
             HStack {
                 Button("Clone") {
@@ -144,9 +157,7 @@ struct CloneRepoView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Add Repository") {
                     // Validate inputs
-                    let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Save-time sanitizer: trim leading/trailing hyphens
-                    let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
+                    let sanitizedTitle = RepoNameSanitizer.forSaving(projectTitle)
                     let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
                         saveMessage = "Please enter both a project title and directory."
@@ -183,11 +194,48 @@ struct CloneRepoView: View {
          .onAppear {
              loadGHRepos()
          }
-     }
+    }
 
     // MARK: - Helpers
     private func shellEscape(_ s: String) -> String {
         return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private func normalizedCloneURL(_ rawValue: String) -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if trimmed.hasPrefix("git@") || trimmed.hasPrefix("ssh://") {
+            return trimmed
+        }
+
+        if trimmed.hasPrefix("https://github.com/") || trimmed.hasPrefix("http://github.com/") {
+            let withoutFragment = trimmed.split(separator: "#", maxSplits: 1).first.map(String.init) ?? trimmed
+            let withoutQuery = withoutFragment.split(separator: "?", maxSplits: 1).first.map(String.init) ?? withoutFragment
+            let cleaned = withoutQuery.hasSuffix("/") ? String(withoutQuery.dropLast()) : withoutQuery
+            return cleaned.hasSuffix(".git") ? cleaned : "\(cleaned).git"
+        }
+
+        return trimmed
+    }
+
+    private func inferredRepositoryName(from link: String) -> String {
+        let normalized = normalizedCloneURL(link)
+        guard !normalized.isEmpty else { return "" }
+
+        let parts = normalized.split { $0 == "/" || $0 == ":" }.map(String.init)
+        let rawName = parts.last?.replacingOccurrences(of: ".git", with: "") ?? ""
+        return RepoNameSanitizer.forSaving(rawName)
+    }
+
+    private func autofillTitleFromLinkIfNeeded() {
+        let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedTitle.isEmpty else { return }
+
+        let inferredName = inferredRepositoryName(from: projectLink)
+        guard !inferredName.isEmpty else { return }
+
+        projectTitle = RepoNameSanitizer.forTyping(inferredName)
     }
 
     private func runGHLogin() async {
@@ -218,11 +266,10 @@ struct CloneRepoView: View {
     }
 
     private func performCloneAndAdd() async {
-        let link = projectLink.trimmingCharacters(in: .whitespacesAndNewlines)
+        let link = normalizedCloneURL(projectLink)
         let base = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        let rawTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         // Use save-time sanitizer for derived paths/names
-        let title = sanitizeProjectNameForSave(rawTitle)
+        let title = RepoNameSanitizer.forSaving(projectTitle)
         guard !link.isEmpty, !base.isEmpty else {
             cloneMessage = "Please provide both repo link and target directory"
             showCloneAlert = true
@@ -239,9 +286,7 @@ struct CloneRepoView: View {
             if !title.isEmpty {
                 derivedName = title
             } else {
-                // Try to extract repo name from link
-                let parts = link.split { $0 == "/" || $0 == ":" }.map { String($0) }
-                derivedName = parts.last?.replacingOccurrences(of: ".git", with: "") ?? "repo"
+                derivedName = inferredRepositoryName(from: link).isEmpty ? "repo" : inferredRepositoryName(from: link)
             }
             targetPath = (base as NSString).appendingPathComponent(derivedName)
         } else {
@@ -265,7 +310,7 @@ struct CloneRepoView: View {
             isCloning = false
             cloningOutput = result.0
             if result.1 == 0 {
-                let nameToSave = title.isEmpty ? URL(fileURLWithPath: targetPath).lastPathComponent : title
+                let nameToSave = title.isEmpty ? RepoNameSanitizer.forSaving(URL(fileURLWithPath: targetPath).lastPathComponent) : title
                 let repo = SavedRepo(name: nameToSave, path: targetPath)
                 modelContext.insert(repo)
                 do {
@@ -310,7 +355,7 @@ struct CloneRepoView: View {
      private func selectGHRepo(_ repo: GHRepo) {
          selectedGHRepo = repo
          // When selecting from GH, show immediate-typing sanitized name (spaces -> '-')
-         projectTitle = sanitizeProjectNameForTyping(repo.name)
+         projectTitle = RepoNameSanitizer.forTyping(repo.name)
          if useHTTPS {
              // Use the repo.url (https) and ensure .git suffix
              var http = repo.url
@@ -396,18 +441,3 @@ struct CloneRepoView: View {
      CloneRepoView()
  }
   
- // Typing sanitizer: replace runs of whitespace with a single hyphen (keeps leading/trailing hyphens so space key yields '-')
- private func sanitizeProjectNameForTyping(_ s: String) -> String {
-     // Replace any whitespace run with hyphen and collapse multiple hyphens
-     var out = s.replacingOccurrences(of: "\\s+", with: "-", options: .regularExpression)
-     out = out.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-     return out
- }
-
-// Save-time sanitizer: similar to typing sanitizer but also trims leading/trailing hyphens
- private func sanitizeProjectNameForSave(_ s: String) -> String {
-     var out = sanitizeProjectNameForTyping(s)
-     while out.hasPrefix("-") { out.removeFirst() }
-     while out.hasSuffix("-") { out.removeLast() }
-     return out
- }

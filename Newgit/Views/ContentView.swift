@@ -10,6 +10,7 @@ import SwiftData
 struct ContentView: View {
     @Query private var savedRepos: [SavedRepo]
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var commandCenter: AppCommandCenter
     @State var showAddRepo = false
     @State var showAddNewRepo = false
     @State var showCloneRepo = false
@@ -28,6 +29,17 @@ struct ContentView: View {
     }
 
     @State private var pendingNavigation: PendingNavigation? = nil
+
+    private var selectedRepositoryPath: String? {
+        if let id = selectionID, let repo = savedRepos.first(where: { $0.id == id }) {
+            return repo.path
+        }
+        return commandCenter.selectedRepositoryPath
+    }
+
+    private var hasSelectedRepository: Bool {
+        selectedRepositoryPath?.isEmpty == false
+    }
 
     var body: some View {
         // Build the split view into a local variable to reduce expression complexity for the compiler
@@ -89,6 +101,7 @@ struct ContentView: View {
             if selectionID == nil, let first = savedRepos.first {
                 selectionID = first.id
             }
+            syncSelectedRepository()
             #if os(macOS)
             NotificationCenter.default.addObserver(forName: .newgitCloneRepo, object: nil, queue: .main) { _ in
                 showCloneRepo = true
@@ -121,12 +134,14 @@ struct ContentView: View {
                 print("current selection id \(sel) not present in new repos -> clearing selection")
                 selectionID = nil
             }
+            syncSelectedRepository()
         })
 
         anyView = AnyView(anyView.onChange(of: selectionID) { old, new in
             if let id = new, let repo = savedRepos.first(where: { $0.id == id }) {
                 debugSelectedName = repo.name
             }
+            syncSelectedRepository()
         })
         anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenRepository)) { notification in
             guard let path = notification.object as? String else { return }
@@ -148,13 +163,22 @@ struct ContentView: View {
                 NotificationCenter.default.post(name: .newgitOpenReleaseInSelectedRepo, object: path)
             }
         })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitCreateIssue)) { notification in
+            guard let path = notification.object as? String else { return }
+            openRepository(at: path)
+            pendingNavigation = .issues(path)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NotificationCenter.default.post(name: .newgitOpenIssuesInSelectedRepo, object: path)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    NotificationCenter.default.post(name: .newgitCreateIssueInSelectedRepo, object: path)
+                }
+            }
+        })
 
         // Provide a top-level Touch Bar on macOS so items appear in the responder chain
 #if os(macOS)
         anyView = AnyView(anyView.touchBar(content: {
-            Button("Clone Repository") { showCloneRepo = true }
-            Button("Add New Repository") { showAddNewRepo = true }
-            Button("Add Existing Repository") { showAddRepo = true }
+            contentTouchBar
         }))
 #endif
 
@@ -183,9 +207,7 @@ struct ContentView: View {
             }
             .listStyle(.sidebar)
             .touchBar(content: {
-                Button("Clone Repository") { showCloneRepo = true }
-                Button("Add New Repository") { showAddNewRepo = true }
-                Button("Add Existing Repository") { showAddRepo = true }
+                contentTouchBar
             })
         }
         .cornerRadius(12)
@@ -249,6 +271,7 @@ struct ContentView: View {
         guard let repo = savedRepos.first(where: { $0.path == path }) else { return }
         selectionID = repo.id
         debugSelectedName = repo.name
+        syncSelectedRepository()
     }
 
     private func handlePendingNavigation(for path: String) {
@@ -263,6 +286,76 @@ struct ContentView: View {
         default:
             break
         }
+    }
+
+    private func syncSelectedRepository() {
+        guard let id = selectionID,
+              let repo = savedRepos.first(where: { $0.id == id }) else {
+            commandCenter.selectedRepositoryPath = savedRepos.first?.path
+            return
+        }
+
+        commandCenter.selectedRepositoryPath = repo.path
+    }
+
+    @ViewBuilder
+    private var contentTouchBar: some View {
+        HStack(spacing: 10) {
+            touchBarButton("Clone") { showCloneRepo = true }
+            touchBarButton("Add Existing") { showAddRepo = true }
+            touchBarButton("Add New") { showAddNewRepo = true }
+            touchBarButton("Push", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitShowPushInSelectedRepo, object: selectedRepositoryPath)
+            }
+            touchBarButton("Pull", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitPullInSelectedRepo, object: selectedRepositoryPath)
+            }
+            touchBarButton("Stash", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitShowStashInSelectedRepo, object: selectedRepositoryPath)
+            }
+            touchBarButton("Issues", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitOpenIssues, object: selectedRepositoryPath)
+            }
+            touchBarButton("PRs", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitShowPullRequestsInSelectedRepo, object: selectedRepositoryPath)
+            }
+            touchBarButton("New Issue", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitCreateIssue, object: selectedRepositoryPath)
+            }
+            touchBarButton("New PR", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitShowCreatePullRequestInSelectedRepo, object: selectedRepositoryPath)
+            }
+            touchBarButton("Release", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitOpenRelease, object: selectedRepositoryPath)
+            }
+            touchBarButton("Refresh", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitRefreshSelectedRepo, object: selectedRepositoryPath)
+            }
+        }
+        .buttonStyle(.plain)
+        .tint(.primary)
+    }
+
+    private func touchBarButton(_ title: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.clear)
+                .foregroundStyle(disabled ? .secondary : .primary)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 }
 

@@ -173,12 +173,7 @@ private enum RepoIntentSupport {
     }
 
     nonisolated static func sanitizedRepositoryName(_ name: String) -> String {
-        let pieces = name.split { $0.isWhitespace }
-        let joined = pieces.joined(separator: "-")
-        var sanitized = joined.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-        while sanitized.hasPrefix("-") { sanitized.removeFirst() }
-        while sanitized.hasSuffix("-") { sanitized.removeLast() }
-        return sanitized
+        RepoNameSanitizer.forSaving(name)
     }
 
     nonisolated static func defaultRepositoryName(for path: String) -> String {
