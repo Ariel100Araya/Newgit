@@ -28,7 +28,7 @@ struct AddRepoView: View {
 
     init(initialDirectory: String? = nil) {
         let suggestedDirectory = initialDirectory ?? "\(NSHomeDirectory())/Documents/Projects/"
-        let suggestedTitle = initialDirectory.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+        let suggestedTitle = initialDirectory.map { RepoNameSanitizer.forTyping(URL(fileURLWithPath: $0).lastPathComponent) } ?? ""
         _projectDirectory = State(initialValue: suggestedDirectory)
         _projectTitle = State(initialValue: suggestedTitle)
     }
@@ -55,10 +55,13 @@ struct AddRepoView: View {
             }
             .padding(.bottom)
             Text("Enter a title")
-            TextField("Enter a title", text: Binding(get: { projectTitle }, set: { new in
-                // Typing sanitizer: convert whitespace runs to hyphens immediately so pressing Space inserts '-'
-                projectTitle = sanitizeProjectNameForTyping(new)
-            }))
+            TextField("Enter a title", text: $projectTitle)
+            .onChange(of: projectTitle) { _, newValue in
+                let sanitized = RepoNameSanitizer.forTyping(newValue)
+                if sanitized != newValue {
+                    projectTitle = sanitized
+                }
+            }
             .padding(.bottom)
             if #available(macOS 26.0, *) {
                 Button("Add Repository") {
@@ -106,6 +109,7 @@ struct AddRepoView: View {
         }
         .padding()
         .navigationTitle("Add Repository")
+        .accessibilityIdentifier("add-repo-screen")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Add Repository") {
@@ -137,27 +141,10 @@ struct AddRepoView: View {
         }
     }
     
-    // Typing sanitizer: replace runs of whitespace with a single hyphen (keeps leading/trailing hyphens so space key yields '-')
-    private func sanitizeProjectNameForTyping(_ s: String) -> String {
-        var out = s.replacingOccurrences(of: "\\s+", with: "-", options: .regularExpression)
-        out = out.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-        return out
-    }
-
-    // Save-time sanitizer: similar to typing sanitizer but also trims leading/trailing hyphens
-    private func sanitizeProjectNameForSave(_ s: String) -> String {
-        var out = sanitizeProjectNameForTyping(s)
-        while out.hasPrefix("-") { out.removeFirst() }
-        while out.hasSuffix("-") { out.removeLast() }
-        return out
-    }
-    
     // Add Repo
     private func addRepo() {
         showInitConfirm = false
-        let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Save-time sanitizer: trim leading/trailing hyphens
-        let sanitizedTitle = sanitizeProjectNameForSave(trimmedTitle)
+        let sanitizedTitle = RepoNameSanitizer.forSaving(projectTitle)
         let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
             saveMessage = "Please enter both a project title and directory."

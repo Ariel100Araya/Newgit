@@ -108,6 +108,7 @@ struct FirstLaunchView: View {
                                     Button("Clone Repository") {
                                         cloneRepo()
                                     }
+                                    .accessibilityIdentifier("first-launch-clone-button")
                                     .padding()
                                     .buttonStyle(.borderless)
                                     .glassEffect()
@@ -116,6 +117,7 @@ struct FirstLaunchView: View {
                                     Button("Clone Repository") {
                                         cloneRepo()
                                     }
+                                    .accessibilityIdentifier("first-launch-clone-button")
                                     .padding()
                                     .buttonStyle(.borderless)
                                 }
@@ -123,6 +125,7 @@ struct FirstLaunchView: View {
                                     Button("Add existing Repository") {
                                         addExistingRepo()
                                     }
+                                    .accessibilityIdentifier("first-launch-add-existing-button")
                                     .padding()
                                     .buttonStyle(.borderless)
                                     .glassEffect()
@@ -131,6 +134,7 @@ struct FirstLaunchView: View {
                                     Button("Add existing Repository") {
                                         addExistingRepo()
                                     }
+                                    .accessibilityIdentifier("first-launch-add-existing-button")
                                     .padding()
                                     .buttonStyle(.borderless)
                                 }
@@ -138,6 +142,7 @@ struct FirstLaunchView: View {
                                     Button("Add new Repository") {
                                         addNewRepo()
                                     }
+                                    .accessibilityIdentifier("first-launch-add-new-button")
                                     .padding()
                                     .buttonStyle(.borderless)
                                     .glassEffect()
@@ -146,6 +151,7 @@ struct FirstLaunchView: View {
                                     Button("Add new Repository") {
                                         addNewRepo()
                                     }
+                                    .accessibilityIdentifier("first-launch-add-new-button")
                                     .padding()
                                     .buttonStyle(.borderless)
                                 }
@@ -292,6 +298,7 @@ struct FirstLaunchView: View {
         // Animate welcome action appearance
         .animation(.easeInOut(duration: 0.25), value: showWelcomeActions)
         .padding()
+        .accessibilityIdentifier("first-launch-root")
         .onAppear {
             // ensure actions are hidden while checking starts
             showWelcomeActions = false
@@ -389,6 +396,18 @@ struct FirstLaunchView: View {
     }
 
     private func checkPrereqs() {
+        if let mockUser = UITestLaunchConfiguration.firstLaunchUser {
+            hasBrew = true
+            hasGH = true
+            ghAuthenticated = true
+            githubUser = mockUser
+            githubAvatarURL = nil
+            isChecking = false
+            lastError = nil
+            showWelcomeActions = true
+            return
+        }
+
         isChecking = true
         lastError = nil
         DispatchQueue.global(qos: .utility).async {

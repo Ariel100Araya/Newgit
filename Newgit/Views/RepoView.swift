@@ -60,530 +60,549 @@ struct RepoView: View {
     @State private var showReleaseLink: Bool = false
     
     var body: some View {
-        // Use a NavigationStack so we can push the IssuesView onto the navigation stack instead of presenting a sheet
-        NavigationStack {
-            VStack {
-                urgentInsightsBanner()
-                    .padding([.horizontal, .top])
+        let navigation = NavigationStack {
+            repositoryContent
+                .navigationDestination(isPresented: $showIssuesLink) {
+                    IssuesView(projectDirectory: projectDirectory)
+                }
+                .navigationDestination(isPresented: $showInsightsLink) {
+                    insightsDestinationView()
+                }
+                .navigationDestination(isPresented: $showPullRequestsLink) {
+                    PullRequestsView(projectDirectory: projectDirectory)
+                }
+                .navigationDestination(isPresented: $showReleaseLink) {
+                    ReleaseView(projectDirectory: projectDirectory)
+                }
+        }
 
-                HStack {
-                    // Left pane: selectable list of changed files
-                    VStack { // Removed ScrollView to avoid embedding List inside a ScrollView which can collapse the list
-                        if changedFiles.isEmpty {
-                            VStack {
-                                Text("It seems like there isn't any changed files. Time to get to work!")
-                                    .font(.title)
-                                    .multilineTextAlignment(.center)
-                                    .padding()
-                                    .bold()
-                                // I should probably add some buttons for common actions here like Open in Finder, terminal, etc.
-                                HStack {
-                                    // Simplified: delegate heavy view-building to small helper functions to avoid compiler timeouts
-                                    openMenuView()
-                                    openTerminalButton()
-                                    openRepoButton()
-                                }
-                            }
-                        }
-                        VStack(alignment: .leading) {
-                            if changedFiles.isEmpty {
-                                
-                            } else {
-                                Text("Changed Files:")
-                                    .padding()
-                                    .font(.title)
-                                    .bold()
-                                List(changedFiles, id: \.self) { file in
-                                    Button(action: {
-                                        selectFile(file)
-                                    }) {
-                                        HStack {
-                                            Text(file)
-                                                .font(.title3)
-                                                .foregroundColor(.primary)
-                                                .padding(.horizontal)
-                                            Spacer()
-                                            if selectedFile == file {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .listStyle(.plain)
-                                .frame(minWidth: 240)
-                            }
-                        }
-                    }
-                    // Right pane: show the diff for the selected file
-                    if !changedFiles.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading) {
-                                Text("Selected File:")
-                                    .padding()
-                                    .font(.title)
-                                    .bold()
-                                
-                                if let selected = selectedFile {
-                                    Text(selected)
-                                        .padding(.horizontal)
-                                        .font(.title3)
-                                        .bold()
-                                    
-                                    ScrollView {
-                                        // Use monospaced font so diffs look readable
-                                        if selectedFileDiff.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                            Text("Loading diff...")
-                                                .italic()
-                                                .padding(.horizontal)
-                                                .font(.system(.body, design: .monospaced))
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                        } else {
-                                            Text(selectedFileDiff)
-                                                .padding(.horizontal)
-                                                .font(.system(.body, design: .monospaced))
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                    }
-                                } else {
-                                    Text("Click on a file to select it and see its changes")
-                                        .padding(.horizontal)
-                                        .font(.title3)
-                                }
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-                /*
-                 VStack (alignment: .leading) {
-                 Text("Enter a push title")
-                 .padding()
-                 TextField("Enter a push title", text: $pushTitle)
-                 .padding()
-                 if showCommandOutput {
-                 let changeDirCommand = "cd \(projectDirectory) && git add . && git commit -m \"\(pushTitle)\" && git push"
-                 Text(runCommand(changeDirCommand).output)
-                 }
-                 }
-                 */
-            }
-            .navigationTitle(repoTitle)
-            .toolbar {
-                ToolbarItemGroup(placement: .secondaryAction) {
-                    // Branch menu: dynamically list branches and allow checkout
-                    Menu("Branch: \(currentBranch.isEmpty ? "Main" : currentBranch)") {
-                        ForEach(branches, id: \.self) { branch in
-                            Button(action: {
-                                checkoutBranch(branch)
-                            }) {
-                                HStack {
-                                    Text(branch)
-                                    Spacer()
-                                    if branch == currentBranch {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                        if branches.isEmpty {
-                            Button("No branches found") { }
-                        }
-                        Divider()
-                        Button("Add Branch...") {
-                            newBranchName = ""
-                            print("Branch menu: Add Branch tapped")
-                            print("NSApp windows: \(NSApp.windows.map { $0.title }) keyWindow: \(String(describing: NSApp.keyWindow)) mainWindow: \(String(describing: NSApp.mainWindow))")
-                            // slightly longer delay to ensure the NSMenu closes before sheet presentation
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                print("Presenting AddBranch sheet now")
-                                showAddBranchSheet = true
-                            }
-                        }
-                        Button("Delete Branch...") {
-                            // choose a sensible default (first branch that's not current)
-                            branchToDelete = branches.first(where: { $0 != currentBranch }) ?? ""
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                showDeleteBranchSheet = true
-                            }
-                        }
-                        Button("Merge current into…") {
-                            // Default to first branch that's not the current one
-                            mergeTargetBranch = branches.first(where: { $0 != currentBranch }) ?? ""
-                            print("Branch menu: Merge tapped, target=\(mergeTargetBranch)")
-                            print("NSApp windows: \(NSApp.windows.map { $0.title }) keyWindow: \(String(describing: NSApp.keyWindow)) mainWindow: \(String(describing: NSApp.mainWindow))")
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                print("Presenting Merge sheet now")
-                                showMergeSheet = true
-                            }
-                        }
-                        Button("Create Pull Request") {
-                            prTitle = ""
-                            prBody = ""
-                            prBaseBranch = branches.first(where: { $0 != currentBranch }) ?? (branches.first ?? "main")
-                            print("Branch menu: Create PR tapped, base=\(prBaseBranch)")
-                            print("NSApp windows: \(NSApp.windows.map { $0.title }) keyWindow: \(String(describing: NSApp.keyWindow)) mainWindow: \(String(describing: NSApp.mainWindow))")
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                print("Presenting PR sheet now")
-                                showPRSheet = true
-                            }
-                        }
-                    }
-                    Menu("Actions") {
-                        Button("Pull") { performPull() }
-                        Button("Push") { showPush = true }
-                            .disabled(!canPush)
-                        Button("Insights") {
-                            showInsightsLink = true
-                        }
-                        Button("Stash Changes...") {
-                            stashMessage = ""
-                            stashIncludeUntracked = true
-                            showStashSheet = true
-                        }
-                            .disabled(changedFiles.isEmpty)
-                        Divider()
-                        Button("Go back to previous commit") {
-                            // Confirm with the user before performing the revert
-                            confirmAndRevertLatestCommit()
-                        }
-                        .help("Create a new commit that reverts the latest commit (HEAD). Requires a clean working tree.")
-                        Divider()
-                        Button("Show issues") {
-                            // Navigate to the Issues view (it will fetch its own data on appear)
-                            showIssuesLink = true
-                        }
-                        Button("Show Pull Requests") {
-                            // Navigate to the PullRequestsView
-                            showPullRequestsLink = true
-                        }
-                        Divider()
-                        Button("Add New Release") {
-                            // Push the ReleaseView onto the NavigationStack
-                            showReleaseLink = true
-                        }
-                    }
-                    Menu("Open") {
-                        Button("Open workspace in Finder") {
-                            let homeURL = URL(fileURLWithPath: projectDirectory)
-                            NSWorkspace.shared.activateFileViewerSelecting([homeURL])
-                        }
-                        Divider()
-                        Button("Open workspace in Xcode") {
-                            if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
-                                let config = NSWorkspace.OpenConfiguration()
-                                config.arguments = [projectDirectory]
-                                NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
-                            }
-                        }
-                        Button("Open workspace in Visual Studio Code") {
-                            let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
-                            let config = NSWorkspace.OpenConfiguration()
-                            config.arguments = [projectDirectory]
-                            NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
-                        }
-                        Divider()
-                        Button("Open directory in Terminal") {
-                            if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-                                let config = NSWorkspace.OpenConfiguration()
-                                config.arguments = [projectDirectory]
-                                NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
-                            } else {
-                                // Fallback URL scheme
-                                let url = URL(string: "terminal://\(projectDirectory)")!
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        Divider()
-                        Button("Open repository in GitHub") {
-                            openRepositoryInGitHub()
-                        }
-                    }
-                }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button("Push") {
-                        showPush = true
-                    }
-                    .disabled(!canPush)
-                    .padding(.horizontal)
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-            // Add state for Pull Requests navigation
-            // Pull Requests view is now integrated into the RepoView navigation stack
-            
-            .sheet(isPresented: $showPush) {
-                PushView(projectDirectory: projectDirectory, onSuccess: {
-                    // Optimistically clear the local changed-files UI so the user sees updated state immediately.
-                    DispatchQueue.main.async {
-                        self.changedFiles = []
-                        self.selectedFile = nil
-                        self.selectedFileDiff = ""
-                        self.changedFilesFallbackOutput = ""
-                    }
-                    // Also kick off a more robust refresh sequence to reconcile with git on disk.
-                    refreshRepositoryState()
-                })
-            }
-            // Add Branch sheet
-            .sheet(isPresented: $showAddBranchSheet) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Create a new branch")
-                        .font(.headline)
-                    TextField("Branch name", text: $newBranchName)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    HStack {
-                        Spacer()
-                        Button("Cancel") {
-                            showAddBranchSheet = false
-                        }
-                        Button("Create") {
-                            let name = newBranchName.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !name.isEmpty else { return }
-                            showAddBranchSheet = false
-                            createBranch(name)
-                        }
-                        .keyboardShortcut(.defaultAction)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 420, minHeight: 140)
-            }
-            
-            // Delete Branch sheet
-            .sheet(isPresented: $showDeleteBranchSheet) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Delete a branch")
-                        .font(.headline)
-                    
-                    if branches.filter({ $0 != currentBranch }).isEmpty {
-                        Text("No other branches available to delete.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        Picker("Branch to delete", selection: $branchToDelete) {
-                            ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
-                                Text(b).tag(b)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .onAppear {
-                            if branchToDelete.isEmpty {
-                                branchToDelete = branches.first(where: { $0 != currentBranch }) ?? ""
-                            }
-                        }
-                    }
-                    
-                    Text("This will delete the selected local branch. If it has unmerged commits, a force-delete will be attempted.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                    
-                    HStack {
-                        Spacer()
-                        Button("Cancel") {
-                            showDeleteBranchSheet = false
-                        }
-                        Button("Delete") {
-                            let toDelete = branchToDelete.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !toDelete.isEmpty else { return }
-                            showDeleteBranchSheet = false
-                            deleteBranch(toDelete)
-                        }
-                        .foregroundColor(.red)
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(branches.filter({ $0 != currentBranch }).isEmpty)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 480, minHeight: 160)
-            }
-            
-            // Merge sheet
-            .sheet(isPresented: $showMergeSheet) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Merge current branch into…")
-                        .font(.headline)
-                    
-                    if branches.filter({ $0 != currentBranch }).isEmpty {
-                        Text("No other branches available to merge into.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        Picker("Target branch", selection: $mergeTargetBranch) {
-                            ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
-                                Text(b).tag(b)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                    
-                    HStack {
-                        Spacer()
-                        Button("Cancel") {
-                            showMergeSheet = false
-                        }
-                        Button("Merge") {
-                            let target = mergeTargetBranch.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !target.isEmpty else { return }
-                            showMergeSheet = false
-                            mergeCurrentInto(target)
-                        }
-                        .disabled(mergeTargetBranch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 480, minHeight: 160)
-            }
-            
-            // Pull Request sheet
-            .sheet(isPresented: $showPRSheet) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Create Pull Request")
-                        .font(.headline)
-                    
-                    TextField("PR title", text: $prTitle)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
-                    TextEditor(text: $prBody)
-                        .frame(height: 120)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.2)))
-                    
-                    Picker("Base branch", selection: $prBaseBranch) {
-                        ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
-                            Text(b).tag(b)
-                        }
-                        // fallback
-                        ForEach(branches, id: \.self) { b in
-                            if branches.filter({ $0 != currentBranch }).isEmpty { Text(b).tag(b) }
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    
-                    HStack {
-                        Spacer()
-                        Button("Cancel") {
-                            showPRSheet = false
-                        }
-                        Button("Create PR") {
-                            let title = prTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let body = prBody.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let base = prBaseBranch.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !title.isEmpty, !base.isEmpty else { return }
-                            showPRSheet = false
-                            createPullRequest(base: base, title: title, body: body)
-                        }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(prTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || prBaseBranch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 520, minHeight: 320)
-            }
-            .sheet(isPresented: $showStashSheet) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Stash changes")
-                        .font(.headline)
-                    
-                    TextField("Message (optional)", text: $stashMessage)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
-                    Toggle("Include untracked files", isOn: $stashIncludeUntracked)
-                    
-                    Text("This stores your current working changes in Git and refreshes the repo view.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                    
-                    HStack {
-                        Spacer()
-                        Button("Cancel") {
-                            showStashSheet = false
-                        }
-                        Button("Stash") {
-                            showStashSheet = false
-                            performStash(message: stashMessage, includeUntracked: stashIncludeUntracked)
-                        }
-                        .keyboardShortcut(.defaultAction)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 420, minHeight: 170)
-            }
-            // Load the changed files when the view appears (do heavy work off the main thread so UI remains responsive)
-            .navigationDestination(isPresented: $showIssuesLink) {
-                IssuesView(projectDirectory: projectDirectory)
-            }
-            .navigationDestination(isPresented: $showInsightsLink) {
-                insightsDestinationView()
-            }
-            .navigationDestination(isPresented: $showPullRequestsLink) {
-                PullRequestsView(projectDirectory: projectDirectory)
-            }
-            .navigationDestination(isPresented: $showReleaseLink) {
-                ReleaseView(projectDirectory: projectDirectory)
-            }
-            .onAppear {
-                DispatchQueue.global(qos: .userInitiated).async {
-                    loadChangedFiles()
-                    loadBranches()
-                    loadRepoStatus()
-                    // recompute push availability after we've loaded state
-                    DispatchQueue.global(qos: .utility).async {
-                        updatePushAvailability()
-                    }
-                }
-            }
-            // When the push sheet is dismissed, refresh changed files & branches.
-            .onChange(of: showPush) { oldValue, newValue in
-                if newValue == false {
-                    refreshRepositoryState()
-                }
-            }
-            // Debug: log when our sheet flags change so we can see whether presentation state flips
-            .onChange(of: showAddBranchSheet) { oldValue, newValue in
-                print("showAddBranchSheet changed -> \(newValue) (old=\(oldValue))")
-                if newValue == false { refreshRepositoryState() }
-            }
-            .onChange(of: showMergeSheet) { oldValue, newValue in
-                print("showMergeSheet changed -> \(newValue) (old=\(oldValue))")
-                if newValue == false { refreshRepositoryState() }
-            }
-            .onChange(of: showPRSheet) { oldValue, newValue in
-                print("showPRSheet changed -> \(newValue) (old=\(oldValue))")
-                if newValue == false { refreshRepositoryState() }
-            }
-            .onChange(of: showStashSheet) { oldValue, newValue in
-                print("showStashSheet changed -> \(newValue) (old=\(oldValue))")
-                if newValue == false { refreshRepositoryState() }
-            }
-            .onChange(of: currentBranch) { old, new in
-                // Recompute push availability when the current branch changes
-                DispatchQueue.global(qos: .utility).async {
-                    updatePushAvailability()
-                }
-            }
-            .onChange(of: branches) { old, new in
-                // Recompute push availability when branch list changes (may affect upstream/ahead checks)
-                DispatchQueue.global(qos: .utility).async {
-                    updatePushAvailability()
-                }
-            }
-            .onChange(of: changedFiles) { oldFiles, newFiles in
-                // Immediately enable push if there are any changed files so UI responds instantly
+        var anyView = AnyView(navigation)
+
+        anyView = AnyView(anyView.sheet(isPresented: $showPush) {
+            PushView(projectDirectory: projectDirectory, onSuccess: {
                 DispatchQueue.main.async {
-                    self.canPush = !newFiles.isEmpty
+                    self.changedFiles = []
+                    self.selectedFile = nil
+                    self.selectedFileDiff = ""
+                    self.changedFilesFallbackOutput = ""
                 }
-                // Then reconcile more expensive checks in background
+                refreshRepositoryState()
+            })
+        })
+
+        anyView = AnyView(anyView.sheet(isPresented: $showAddBranchSheet) { addBranchSheet })
+        anyView = AnyView(anyView.sheet(isPresented: $showDeleteBranchSheet) { deleteBranchSheet })
+        anyView = AnyView(anyView.sheet(isPresented: $showMergeSheet) { mergeBranchSheet })
+        anyView = AnyView(anyView.sheet(isPresented: $showPRSheet) { pullRequestSheet })
+        anyView = AnyView(anyView.sheet(isPresented: $showStashSheet) { stashSheet })
+
+        anyView = AnyView(anyView.onAppear {
+            DispatchQueue.global(qos: .userInitiated).async {
+                loadChangedFiles()
+                loadBranches()
+                loadRepoStatus()
                 DispatchQueue.global(qos: .utility).async {
                     updatePushAvailability()
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .newgitOpenIssuesInSelectedRepo)) { notification in
-                guard let path = notification.object as? String, path == projectDirectory else { return }
+        })
+
+        anyView = AnyView(anyView.onChange(of: showPush) { _, newValue in
+            if newValue == false {
+                refreshRepositoryState()
+            }
+        })
+        anyView = AnyView(anyView.onChange(of: showAddBranchSheet) { oldValue, newValue in
+            print("showAddBranchSheet changed -> \(newValue) (old=\(oldValue))")
+            if newValue == false { refreshRepositoryState() }
+        })
+        anyView = AnyView(anyView.onChange(of: showMergeSheet) { oldValue, newValue in
+            print("showMergeSheet changed -> \(newValue) (old=\(oldValue))")
+            if newValue == false { refreshRepositoryState() }
+        })
+        anyView = AnyView(anyView.onChange(of: showPRSheet) { oldValue, newValue in
+            print("showPRSheet changed -> \(newValue) (old=\(oldValue))")
+            if newValue == false { refreshRepositoryState() }
+        })
+        anyView = AnyView(anyView.onChange(of: showStashSheet) { oldValue, newValue in
+            print("showStashSheet changed -> \(newValue) (old=\(oldValue))")
+            if newValue == false { refreshRepositoryState() }
+        })
+        anyView = AnyView(anyView.onChange(of: currentBranch) { _, _ in
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
+            }
+        })
+        anyView = AnyView(anyView.onChange(of: branches) { _, _ in
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
+            }
+        })
+        anyView = AnyView(anyView.onChange(of: changedFiles) { _, newFiles in
+            DispatchQueue.main.async {
+                self.canPush = !newFiles.isEmpty
+            }
+            DispatchQueue.global(qos: .utility).async {
+                updatePushAvailability()
+            }
+        })
+
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenIssuesInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            showIssuesLink = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitShowPullRequestsInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            showPullRequestsLink = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitShowPushInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            showPush = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitPullInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            performPull()
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitShowStashInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            stashMessage = ""
+            stashIncludeUntracked = true
+            showStashSheet = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitShowCreatePullRequestInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            prTitle = ""
+            prBody = ""
+            prBaseBranch = branches.first(where: { $0 != currentBranch }) ?? (branches.first ?? "main")
+            showPRSheet = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenReleaseInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            showReleaseLink = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitRefreshSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            refreshRepositoryState()
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenFinderInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            let homeURL = URL(fileURLWithPath: projectDirectory)
+            NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenTerminalInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            openDirectoryInTerminal()
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenGitHubInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            openRepositoryInGitHub()
+        })
+
+        return anyView
+    }
+
+    @ViewBuilder
+    private var repositoryContent: some View {
+        VStack {
+            urgentInsightsBanner()
+                .padding([.horizontal, .top])
+
+            HStack {
+                VStack {
+                    if changedFiles.isEmpty {
+                        VStack {
+                            Text("It seems like there isn't any changed files. Time to get to work!")
+                                .font(.title)
+                                .multilineTextAlignment(.center)
+                                .padding()
+                                .bold()
+                            HStack {
+                                openMenuView()
+                                openTerminalButton()
+                                openRepoButton()
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading) {
+                        if !changedFiles.isEmpty {
+                            Text("Changed Files:")
+                                .padding()
+                                .font(.title)
+                                .bold()
+                            List(changedFiles, id: \.self) { file in
+                                Button(action: {
+                                    selectFile(file)
+                                }) {
+                                    HStack {
+                                        Text(file)
+                                            .font(.title3)
+                                            .foregroundColor(.primary)
+                                            .padding(.horizontal)
+                                        Spacer()
+                                        if selectedFile == file {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .listStyle(.plain)
+                            .frame(minWidth: 240)
+                        }
+                    }
+                }
+
+                if !changedFiles.isEmpty {
+                    ScrollView {
+                        VStack(alignment: .leading) {
+                            Text("Selected File:")
+                                .padding()
+                                .font(.title)
+                                .bold()
+
+                            if let selected = selectedFile {
+                                Text(selected)
+                                    .padding(.horizontal)
+                                    .font(.title3)
+                                    .bold()
+
+                                ScrollView {
+                                    if selectedFileDiff.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        Text("Loading diff...")
+                                            .italic()
+                                            .padding(.horizontal)
+                                            .font(.system(.body, design: .monospaced))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    } else {
+                                        Text(selectedFileDiff)
+                                            .padding(.horizontal)
+                                            .font(.system(.body, design: .monospaced))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                            } else {
+                                Text("Click on a file to select it and see its changes")
+                                    .padding(.horizontal)
+                                    .font(.title3)
+                            }
+                        }
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .navigationTitle(repoTitle)
+        .accessibilityIdentifier("repo-view-\(repoTitle)")
+        .toolbar {
+            repoToolbar
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var repoToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .secondaryAction) {
+            branchMenu
+            actionsMenu
+            openMenu
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button("Push") {
+                showPush = true
+            }
+            .disabled(!canPush)
+            .padding(.horizontal)
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private var branchMenu: some View {
+        Menu("Branch: \(currentBranch.isEmpty ? "Main" : currentBranch)") {
+            ForEach(branches, id: \.self) { branch in
+                Button(action: {
+                    checkoutBranch(branch)
+                }) {
+                    HStack {
+                        Text(branch)
+                        Spacer()
+                        if branch == currentBranch {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+            if branches.isEmpty {
+                Button("No branches found") { }
+            }
+            Divider()
+            Button("Add Branch...") {
+                newBranchName = ""
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    showAddBranchSheet = true
+                }
+            }
+            Button("Delete Branch...") {
+                branchToDelete = branches.first(where: { $0 != currentBranch }) ?? ""
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    showDeleteBranchSheet = true
+                }
+            }
+            Button("Merge current into…") {
+                mergeTargetBranch = branches.first(where: { $0 != currentBranch }) ?? ""
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    showMergeSheet = true
+                }
+            }
+            Button("Create Pull Request") {
+                prTitle = ""
+                prBody = ""
+                prBaseBranch = branches.first(where: { $0 != currentBranch }) ?? (branches.first ?? "main")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    showPRSheet = true
+                }
+            }
+        }
+    }
+
+    private var actionsMenu: some View {
+        Menu("Actions") {
+            Button("Pull") { performPull() }
+            Button("Push") { showPush = true }
+                .disabled(!canPush)
+            Button("Insights") {
+                showInsightsLink = true
+            }
+            Button("Stash Changes...") {
+                stashMessage = ""
+                stashIncludeUntracked = true
+                showStashSheet = true
+            }
+            .disabled(changedFiles.isEmpty)
+            Divider()
+            Button("Go back to previous commit") {
+                confirmAndRevertLatestCommit()
+            }
+            .help("Create a new commit that reverts the latest commit (HEAD). Requires a clean working tree.")
+            Divider()
+            Button("Show issues") {
                 showIssuesLink = true
             }
-            .onReceive(NotificationCenter.default.publisher(for: .newgitOpenReleaseInSelectedRepo)) { notification in
-                guard let path = notification.object as? String, path == projectDirectory else { return }
+            Button("Show Pull Requests") {
+                showPullRequestsLink = true
+            }
+            Divider()
+            Button("Add New Release") {
                 showReleaseLink = true
             }
         }
+    }
+
+    private var openMenu: some View {
+        Menu("Open") {
+            Button("Open workspace in Finder") {
+                let homeURL = URL(fileURLWithPath: projectDirectory)
+                NSWorkspace.shared.activateFileViewerSelecting([homeURL])
+            }
+            Divider()
+            Button("Open workspace in Xcode") {
+                if let xcodeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.dt.Xcode") {
+                    let config = NSWorkspace.OpenConfiguration()
+                    config.arguments = [projectDirectory]
+                    NSWorkspace.shared.openApplication(at: xcodeURL, configuration: config)
+                }
+            }
+            Button("Open workspace in Visual Studio Code") {
+                let vsCodeURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+                let config = NSWorkspace.OpenConfiguration()
+                config.arguments = [projectDirectory]
+                NSWorkspace.shared.openApplication(at: vsCodeURL, configuration: config)
+            }
+            Divider()
+            Button("Open directory in Terminal") {
+                openDirectoryInTerminal()
+            }
+            Divider()
+            Button("Open repository in GitHub") {
+                openRepositoryInGitHub()
+            }
+        }
+    }
+
+    private var addBranchSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Create a new branch")
+                .font(.headline)
+            TextField("Branch name", text: $newBranchName)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showAddBranchSheet = false
+                }
+                Button("Create") {
+                    let name = newBranchName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !name.isEmpty else { return }
+                    showAddBranchSheet = false
+                    createBranch(name)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(minWidth: 420, minHeight: 140)
+    }
+
+    private var deleteBranchSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Delete a branch")
+                .font(.headline)
+
+            if branches.filter({ $0 != currentBranch }).isEmpty {
+                Text("No other branches available to delete.")
+                    .foregroundColor(.secondary)
+            } else {
+                Picker("Branch to delete", selection: $branchToDelete) {
+                    ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
+                        Text(b).tag(b)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onAppear {
+                    if branchToDelete.isEmpty {
+                        branchToDelete = branches.first(where: { $0 != currentBranch }) ?? ""
+                    }
+                }
+            }
+
+            Text("This will delete the selected local branch. If it has unmerged commits, a force-delete will be attempted.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showDeleteBranchSheet = false
+                }
+                Button("Delete") {
+                    let toDelete = branchToDelete.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !toDelete.isEmpty else { return }
+                    showDeleteBranchSheet = false
+                    deleteBranch(toDelete)
+                }
+                .foregroundColor(.red)
+                .keyboardShortcut(.defaultAction)
+                .disabled(branches.filter({ $0 != currentBranch }).isEmpty)
+            }
+        }
+        .padding()
+        .frame(minWidth: 480, minHeight: 160)
+    }
+
+    private var mergeBranchSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Merge current branch into…")
+                .font(.headline)
+
+            if branches.filter({ $0 != currentBranch }).isEmpty {
+                Text("No other branches available to merge into.")
+                    .foregroundColor(.secondary)
+            } else {
+                Picker("Target branch", selection: $mergeTargetBranch) {
+                    ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
+                        Text(b).tag(b)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showMergeSheet = false
+                }
+                Button("Merge") {
+                    let target = mergeTargetBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !target.isEmpty else { return }
+                    showMergeSheet = false
+                    mergeCurrentInto(target)
+                }
+                .disabled(mergeTargetBranch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding()
+        .frame(minWidth: 480, minHeight: 160)
+    }
+
+    private var pullRequestSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Create Pull Request")
+                .font(.headline)
+
+            TextField("PR title", text: $prTitle)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+
+            TextEditor(text: $prBody)
+                .frame(height: 120)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.2)))
+
+            Picker("Base branch", selection: $prBaseBranch) {
+                ForEach(branches.filter({ $0 != currentBranch }), id: \.self) { b in
+                    Text(b).tag(b)
+                }
+                ForEach(branches, id: \.self) { b in
+                    if branches.filter({ $0 != currentBranch }).isEmpty { Text(b).tag(b) }
+                }
+            }
+            .pickerStyle(.menu)
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showPRSheet = false
+                }
+                Button("Create PR") {
+                    let title = prTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let body = prBody.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let base = prBaseBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !title.isEmpty, !base.isEmpty else { return }
+                    showPRSheet = false
+                    createPullRequest(base: base, title: title, body: body)
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(prTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || prBaseBranch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding()
+        .frame(minWidth: 520, minHeight: 320)
+    }
+
+    private var stashSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Stash changes")
+                .font(.headline)
+
+            TextField("Message (optional)", text: $stashMessage)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+
+            Toggle("Include untracked files", isOn: $stashIncludeUntracked)
+
+            Text("This stores your current working changes in Git and refreshes the repo view.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showStashSheet = false
+                }
+                Button("Stash") {
+                    showStashSheet = false
+                    performStash(message: stashMessage, includeUntracked: stashIncludeUntracked)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(minWidth: 420, minHeight: 170)
     }
     
     // MARK: - Helpers
@@ -633,6 +652,16 @@ struct RepoView: View {
             NSWorkspace.shared.open(url)
         } else {
             showAlert(title: "Not a GitHub remote", message: "The configured remote does not appear to point to GitHub: \(candidate)")
+        }
+    }
+
+    private func openDirectoryInTerminal() {
+        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+            let config = NSWorkspace.OpenConfiguration()
+            config.arguments = [projectDirectory]
+            NSWorkspace.shared.openApplication(at: terminalURL, configuration: config)
+        } else if let url = URL(string: "terminal://\(projectDirectory)") {
+            NSWorkspace.shared.open(url)
         }
     }
     

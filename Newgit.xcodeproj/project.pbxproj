@@ -10,16 +10,40 @@
 		BEEFB3602EE7ADD90066731D /* ConfettiSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = BEEFB35F2EE7ADD90066731D /* ConfettiSwiftUI */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		E1A100092F8FE20100A10001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BECB750B2EE49C9600825B30 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BECB75122EE49C9600825B30;
+			remoteInfo = Newgit;
+		};
+		E1A100162F8FF00100A10001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BECB750B2EE49C9600825B30 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BECB75122EE49C9600825B30;
+			remoteInfo = Newgit;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		BE8016542F84B92900B6402B /* FinderActions.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FinderActions.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BE8017002F85976600B6402B /* Add Repository to Newgit.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Add Repository to Newgit.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BECB75132EE49C9600825B30 /* Newgit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Newgit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1A100072F8FE20100A10001 /* NewgitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NewgitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1A100142F8FF00100A10001 /* NewgitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NewgitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BECB75152EE49C9600825B30 /* Newgit */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Newgit;
+			sourceTree = "<group>";
+		};
+		E1A100062F8FE20100A10001 /* NewgitTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NewgitTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -47,6 +71,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E1A100082F8FE20100A10001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1A100152F8FF00100A10001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -54,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				BECB75152EE49C9600825B30 /* Newgit */,
+				E1A100062F8FE20100A10001 /* NewgitTests */,
 				BECB75142EE49C9600825B30 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -64,6 +103,8 @@
 				BECB75132EE49C9600825B30 /* Newgit.app */,
 				BE8016542F84B92900B6402B /* FinderActions.appex */,
 				BE8017002F85976600B6402B /* Add Repository to Newgit.appex */,
+				E1A100072F8FE20100A10001 /* NewgitTests.xctest */,
+				E1A100142F8FF00100A10001 /* NewgitUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -132,6 +173,49 @@
 			productReference = BECB75132EE49C9600825B30 /* Newgit.app */;
 			productType = "com.apple.product-type.application";
 		};
+		E1A1000A2F8FE20100A10001 /* NewgitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E1A100102F8FE20100A10001 /* Build configuration list for PBXNativeTarget "NewgitTests" */;
+			buildPhases = (
+				E1A1000B2F8FE20100A10001 /* Sources */,
+				E1A100082F8FE20100A10001 /* Frameworks */,
+				E1A1000C2F8FE20100A10001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E1A1000F2F8FE20100A10001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E1A100062F8FE20100A10001 /* NewgitTests */,
+			);
+			name = NewgitTests;
+			packageProductDependencies = (
+			);
+			productName = NewgitTests;
+			productReference = E1A100072F8FE20100A10001 /* NewgitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E1A100172F8FF00100A10001 /* NewgitUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E1A1001D2F8FF00100A10001 /* Build configuration list for PBXNativeTarget "NewgitUITests" */;
+			buildPhases = (
+				E1A100182F8FF00100A10001 /* Sources */,
+				E1A100152F8FF00100A10001 /* Frameworks */,
+				E1A100192F8FF00100A10001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E1A1001C2F8FF00100A10001 /* PBXTargetDependency */,
+			);
+			name = NewgitUITests;
+			packageProductDependencies = (
+			);
+			productName = NewgitUITests;
+			productReference = E1A100142F8FF00100A10001 /* NewgitUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -150,6 +234,14 @@
 					};
 					BECB75122EE49C9600825B30 = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					E1A1000A2F8FE20100A10001 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = BECB75122EE49C9600825B30;
+					};
+					E1A100172F8FF00100A10001 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = BECB75122EE49C9600825B30;
 					};
 				};
 			};
@@ -173,6 +265,8 @@
 				BECB75122EE49C9600825B30 /* Newgit */,
 				BE8016532F84B92900B6402B /* FinderActions */,
 				BE8016FF2F85976600B6402B /* Add Repository to Newgit */,
+				E1A1000A2F8FE20100A10001 /* NewgitTests */,
+				E1A100172F8FF00100A10001 /* NewgitUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -193,6 +287,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		BECB75112EE49C9600825B30 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1A1000C2F8FE20100A10001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1A100192F8FF00100A10001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -223,7 +331,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E1A1000B2F8FE20100A10001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1A100182F8FF00100A10001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E1A1000F2F8FE20100A10001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BECB75122EE49C9600825B30 /* Newgit */;
+			targetProxy = E1A100092F8FE20100A10001 /* PBXContainerItemProxy */;
+		};
+		E1A1001C2F8FF00100A10001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BECB75122EE49C9600825B30 /* Newgit */;
+			targetProxy = E1A100162F8FF00100A10001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BE8016652F84B92900B6402B /* Debug */ = {
@@ -564,6 +699,98 @@
 			};
 			name = Release;
 		};
+		E1A100112F8FE20100A10001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XA7HZH3U9X;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.arielaraya.NewgitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Newgit.app/Contents/MacOS/Newgit";
+			};
+			name = Debug;
+		};
+		E1A100122F8FE20100A10001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XA7HZH3U9X;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.arielaraya.NewgitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Newgit.app/Contents/MacOS/Newgit";
+			};
+			name = Release;
+		};
+		E1A1001E2F8FF00100A10001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XA7HZH3U9X;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.arielaraya.NewgitUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Newgit;
+			};
+			name = Debug;
+		};
+		E1A1001F2F8FF00100A10001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XA7HZH3U9X;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.arielaraya.NewgitUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Newgit;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -599,6 +826,24 @@
 			buildConfigurations = (
 				BECB751F2EE49C9800825B30 /* Debug */,
 				BECB75202EE49C9800825B30 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E1A100102F8FE20100A10001 /* Build configuration list for PBXNativeTarget "NewgitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E1A100112F8FE20100A10001 /* Debug */,
+				E1A100122F8FE20100A10001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E1A1001D2F8FF00100A10001 /* Build configuration list for PBXNativeTarget "NewgitUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E1A1001E2F8FF00100A10001 /* Debug */,
+				E1A1001F2F8FF00100A10001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

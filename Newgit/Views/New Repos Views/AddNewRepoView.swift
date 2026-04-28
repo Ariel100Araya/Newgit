@@ -44,10 +44,13 @@ struct AddNewRepoView: View {
             }
             .padding(.bottom)
             Text("Enter a title")
-            TextField("Enter a title", text: Binding(get: { projectTitle }, set: { new in
-                // Convert spaces to hyphens as the user types so pressing Space inserts '-'
-                projectTitle = sanitizeProjectName(new)
-            }))
+            TextField("Enter a title", text: $projectTitle)
+            .onChange(of: projectTitle) { _, newValue in
+                let sanitized = RepoNameSanitizer.forTyping(newValue)
+                if sanitized != newValue {
+                    projectTitle = sanitized
+                }
+            }
             .padding(.bottom)
             Toggle(isOn: $makePrivate) {
                 Text("Make repository private on GitHub")
@@ -68,12 +71,12 @@ struct AddNewRepoView: View {
         }
         .padding()
         .navigationTitle("Add Repository")
+        .accessibilityIdentifier("add-new-repo-screen")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Add Repository") {
                     // Validate inputs
-                    let trimmedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let sanitizedTitle = sanitizeProjectName(trimmedTitle)
+                    let sanitizedTitle = RepoNameSanitizer.forSaving(projectTitle)
                     let trimmedPath = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !sanitizedTitle.isEmpty, !trimmedPath.isEmpty else {
                         saveMessage = "Please enter both a project title and directory."
@@ -134,19 +137,9 @@ struct AddNewRepoView: View {
         return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    // sanitize the user-provided project name into a repo-friendly form
-    private func sanitizeProjectName(_ s: String) -> String {
-        let comps = s.split{ $0.isWhitespace }
-        let joined = comps.joined(separator: "-")
-        var out = joined.replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-        while out.hasPrefix("-") { out.removeFirst() }
-        while out.hasSuffix("-") { out.removeLast() }
-        return out
-    }
-
     // Create a local git repo, initialize with README, and publish to GitHub using gh
     private func createAndPublishRepo() async {
-        let title = sanitizeProjectName(projectTitle.trimmingCharacters(in: .whitespacesAndNewlines))
+        let title = RepoNameSanitizer.forSaving(projectTitle)
         let dir = projectDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, !dir.isEmpty else {
             publishMessage = "Please enter both a title and directory"
