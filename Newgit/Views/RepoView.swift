@@ -292,6 +292,7 @@ struct RepoView: View {
             }
         }
         .navigationTitle(repoTitle)
+        .accessibilityIdentifier("repo-view-\(repoTitle)")
         .toolbar {
             repoToolbar
         }

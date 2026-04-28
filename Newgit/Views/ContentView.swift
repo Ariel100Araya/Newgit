@@ -202,10 +202,12 @@ struct ContentView: View {
                     Text(repo.name)
                         .tag(repo.id)
                         .font(.title2)
+                        .accessibilityIdentifier("sidebar-repo-\(repo.name)")
                         .contextMenu { Button("Delete Repository") { repoToDelete = repo; showDeleteDialog = true } }
                 }
             }
             .listStyle(.sidebar)
+            .accessibilityIdentifier("repositories-sidebar")
             .touchBar(content: {
                 contentTouchBar
             })
@@ -223,6 +225,7 @@ struct ContentView: View {
             VStack(alignment: .leading) {
                 Text("Select a repository")
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("select-repository-placeholder")
                 if !debugSelectedName.isEmpty {
                     Text("Last resolved: \(debugSelectedName)")
                         .font(.caption)

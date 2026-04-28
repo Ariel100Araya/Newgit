@@ -11,6 +11,7 @@ import SwiftData
 @main
 struct NewgitApp: App {
     @StateObject private var commandCenter = AppCommandCenter()
+    private let modelContainer = UITestLaunchConfiguration.makeModelContainer()
 
     init() {
         // Small startup log to help diagnose persistence lifecycle
@@ -21,7 +22,7 @@ struct NewgitApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(commandCenter)
-                .modelContainer(for: [SavedRepo.self])
+                .modelContainer(modelContainer)
 #if os(macOS)
                 .touchBar(content: {
                     HStack(spacing: 10) {
@@ -63,35 +64,48 @@ struct NewgitApp: App {
 
         var body: some View {
             Group {
-                if savedRepos.isEmpty {
+                if UITestLaunchConfiguration.forcedScreen == "first-launch" {
                     FirstLaunchView(onShowAddRepo: { showAddRepo = true },
                                     onShowCloneRepo: { showCloneRepo = true },
                                     onShowAddNewRepo: { showAddNewRepo = true })
+                    .accessibilityIdentifier("first-launch-screen")
+                } else if UITestLaunchConfiguration.forcedScreen == "content-view" {
+                    UITestContentView(repos: UITestLaunchConfiguration.seededRepositories())
+                } else if savedRepos.isEmpty {
+                    FirstLaunchView(onShowAddRepo: { showAddRepo = true },
+                                    onShowCloneRepo: { showCloneRepo = true },
+                                    onShowAddNewRepo: { showAddNewRepo = true })
+                    .accessibilityIdentifier("first-launch-screen")
                 } else {
                     ContentView()
+                        .accessibilityIdentifier("content-view-screen")
                 }
             }
             // Diagnostic logging to trace when the savedRepos set changes
             .onAppear {
-                reconcilePersistence(reason: "onAppear")
+                if !UITestLaunchConfiguration.isEnabled {
+                    reconcilePersistence(reason: "onAppear")
+                }
                 print("RootView onAppear: savedRepos count = \(savedRepos.count)")
                 for r in savedRepos { print("RootView repo: \(r.name) id: \(r.id)") }
             }
             .onChange(of: savedRepos) { old, new in
                 print("RootView: savedRepos changed: new count = \(new.count)")
                 for r in new { print("RootView repo: \(r.name) id: \(r.id)") }
-                SavedRepoBackupStore.shared.sync(repos: new)
+                if !UITestLaunchConfiguration.isEnabled {
+                    SavedRepoBackupStore.shared.sync(repos: new)
+                }
                 // If repos newly appeared, dismiss any open first-launch sheets so they don't become orphaned.
                 if !new.isEmpty {
                     showAddRepo = false
                     showAddNewRepo = false
                     showCloneRepo = false
-                } else {
+                } else if UITestLaunchConfiguration.forcedScreen != "content-view" {
                     commandCenter.selectedRepositoryPath = nil
                 }
             }
             .onChange(of: scenePhase) { _, newPhase in
-                if newPhase == .active {
+                if newPhase == .active, !UITestLaunchConfiguration.isEnabled {
                     reconcilePersistence(reason: "scene became active")
                 }
             }
@@ -117,6 +131,50 @@ struct NewgitApp: App {
             }
             .onReceive(NotificationCenter.default.publisher(for: .newgitIntentCloneRepo)) { _ in
                 showCloneRepo = true
+            }
+        }
+
+        private struct UITestContentView: View {
+            let repos: [UITestLaunchConfiguration.SeededRepo]
+            @State private var selectedRepoID: UITestLaunchConfiguration.SeededRepo.ID?
+
+            private var selectedRepo: UITestLaunchConfiguration.SeededRepo? {
+                let fallback = repos.first
+                let selected = repos.first(where: { $0.id == selectedRepoID })
+                return selected ?? fallback
+            }
+
+            var body: some View {
+                NavigationSplitView {
+                    List(repos, selection: $selectedRepoID) { repo in
+                        Text(repo.name)
+                            .tag(repo.id)
+                    }
+                    .accessibilityIdentifier("ui-test-repo-list")
+                } detail: {
+                    if let repo = selectedRepo {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(repo.name)
+                                .font(.title)
+                            Text(repo.path)
+                                .foregroundStyle(.secondary)
+                            Text("UI test detail view")
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding()
+                        .navigationTitle(repo.name)
+                        .accessibilityIdentifier("ui-test-repo-detail-\(repo.name)")
+                    } else {
+                        Text("No repositories seeded for UI tests")
+                            .accessibilityIdentifier("ui-test-empty-content")
+                    }
+                }
+                .accessibilityIdentifier("content-view-screen")
+                .onAppear {
+                    if selectedRepoID == nil {
+                        selectedRepoID = repos.first?.id
+                    }
+                }
             }
         }
 

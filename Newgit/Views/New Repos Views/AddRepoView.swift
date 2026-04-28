@@ -109,6 +109,7 @@ struct AddRepoView: View {
         }
         .padding()
         .navigationTitle("Add Repository")
+        .accessibilityIdentifier("add-repo-screen")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Add Repository") {

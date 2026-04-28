@@ -8,7 +8,7 @@
 import AppIntents
 import Foundation
 
-private enum RepoIntentError: LocalizedError {
+enum RepoIntentError: LocalizedError {
     case missingDirectory(String)
     case notGitRepository(String)
     case commandFailed(String)
@@ -31,7 +31,7 @@ private enum RepoIntentError: LocalizedError {
     }
 }
 
-private enum RepoIntentSupport {
+enum RepoIntentSupport {
     nonisolated static func presentableError(_ error: Error) -> Error {
         if let repoError = error as? RepoIntentError {
             return NSError(
@@ -185,6 +185,40 @@ private enum RepoIntentSupport {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
+    nonisolated static func ensureGitAvailable() throws {
+        let result = runCommand("git --version")
+        guard result.status == 0 else {
+            throw RepoIntentError.commandFailed("Git is not installed or isn't available to Newgit.")
+        }
+    }
+
+    nonisolated static func normalizedCloneURL(_ rawValue: String) -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if trimmed.hasPrefix("git@") || trimmed.hasPrefix("ssh://") {
+            return trimmed
+        }
+
+        if trimmed.hasPrefix("https://github.com/") || trimmed.hasPrefix("http://github.com/") {
+            let withoutFragment = trimmed.split(separator: "#", maxSplits: 1).first.map(String.init) ?? trimmed
+            let withoutQuery = withoutFragment.split(separator: "?", maxSplits: 1).first.map(String.init) ?? withoutFragment
+            let cleaned = withoutQuery.hasSuffix("/") ? String(withoutQuery.dropLast()) : withoutQuery
+            return cleaned.hasSuffix(".git") ? cleaned : "\(cleaned).git"
+        }
+
+        return trimmed
+    }
+
+    nonisolated static func inferredRepositoryName(from link: String) -> String {
+        let normalized = normalizedCloneURL(link)
+        guard !normalized.isEmpty else { return "" }
+
+        let parts = normalized.split { $0 == "/" || $0 == ":" }.map(String.init)
+        let rawName = parts.last?.replacingOccurrences(of: ".git", with: "") ?? ""
+        return sanitizedRepositoryName(rawName)
+    }
+
     nonisolated static func ensureGitRepository(at path: String, initializeIfNeeded: Bool) throws {
         if isGitRepository(path) {
             return
@@ -233,6 +267,42 @@ private enum RepoIntentSupport {
         }
 
         let snapshot = SavedRepoSnapshot(name: finalName, path: normalizedPath)
+        SavedRepoBackupStore.shared.upsert(snapshot: snapshot)
+        return snapshot
+    }
+
+    nonisolated static func cloneRepository(from link: String, into destinationFolderPath: String, name: String?) throws -> SavedRepoSnapshot {
+        try ensureGitAvailable()
+
+        let normalizedLink = normalizedCloneURL(link)
+        guard !normalizedLink.isEmpty else {
+            throw RepoIntentError.invalidInput("Please provide a repository link to clone.")
+        }
+
+        let destinationFolder = try normalizedDirectory(at: destinationFolderPath)
+        let resolvedName = sanitizedRepositoryName(name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+        let finalName = resolvedName.isEmpty ? inferredRepositoryName(from: normalizedLink) : resolvedName
+        guard !finalName.isEmpty else {
+            throw RepoIntentError.invalidInput("Please provide a repository name or use a link with a valid repository name.")
+        }
+
+        let targetPath = (destinationFolder as NSString).appendingPathComponent(finalName)
+        guard !FileManager.default.fileExists(atPath: targetPath) else {
+            throw RepoIntentError.invalidInput("A folder already exists at \(targetPath). Choose another name or destination.")
+        }
+
+        let parentDirectory = (targetPath as NSString).deletingLastPathComponent
+        let makeDirectoryResult = runCommand("mkdir -p \(shellEscape(parentDirectory))")
+        guard makeDirectoryResult.status == 0 else {
+            throw RepoIntentError.commandFailed("Couldn't create the destination folder: \(cleanedOutput(makeDirectoryResult.output))")
+        }
+
+        let cloneResult = runCommand("git clone \(shellEscape(normalizedLink)) \(shellEscape(targetPath))")
+        guard cloneResult.status == 0 else {
+            throw RepoIntentError.commandFailed("Clone failed: \(cleanedOutput(cloneResult.output))")
+        }
+
+        let snapshot = SavedRepoSnapshot(name: finalName, path: targetPath)
         SavedRepoBackupStore.shared.upsert(snapshot: snapshot)
         return snapshot
     }
@@ -1087,6 +1157,44 @@ struct OpenCloneRepositoryIntent: AppIntent {
     }
 }
 
+struct CloneRepositoryFromLinkIntent: AppIntent {
+    static var title: LocalizedStringResource = "Clone Repository From Link"
+    static var description = IntentDescription("Clone a repository from a GitHub or Git URL into a local folder and save it in Newgit.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Repository Link")
+    var repositoryLink: String
+
+    @Parameter(title: "Destination Folder")
+    var destinationFolder: IntentFile
+
+    @Parameter(title: "Repository Name")
+    var repositoryName: String?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Clone \(\.$repositoryLink) into \(\.$destinationFolder)") {
+            \.$repositoryName
+        }
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            guard let destinationPath = destinationFolder.fileURL?.path(percentEncoded: false) else {
+                throw RepoIntentError.invalidInput("Couldn't read the selected destination folder.")
+            }
+
+            let snapshot = try RepoIntentSupport.cloneRepository(
+                from: repositoryLink,
+                into: destinationPath,
+                name: repositoryName
+            )
+            return .result(dialog: IntentDialog(stringLiteral: "Cloned \(snapshot.name) to \(snapshot.path) and saved it in Newgit."))
+        } catch {
+            throw RepoIntentSupport.presentableError(error)
+        }
+    }
+}
+
 struct CreateIssueIntent: AppIntent {
     static var title: LocalizedStringResource = "Create Issue"
     static var description = IntentDescription("Create a GitHub issue for a local repository.")
@@ -1286,13 +1394,13 @@ struct NewgitShortcuts: AppShortcutsProvider {
                 systemImageName: "plus.square.on.square"
             ),
             AppShortcut(
-                intent: OpenCloneRepositoryIntent(),
+                intent: CloneRepositoryFromLinkIntent(),
                 phrases: [
-                    "Clone a repository in \(.applicationName)",
-                    "Open clone repository in \(.applicationName)"
+                    "Clone a repository from a link with \(.applicationName)",
+                    "Clone a GitHub link in \(.applicationName)"
                 ],
-                shortTitle: "Clone Repo",
-                systemImageName: "square.on.square"
+                shortTitle: "Clone Link",
+                systemImageName: "link.badge.plus"
             ),
             AppShortcut(
                 intent: CreateIssueIntent(),
