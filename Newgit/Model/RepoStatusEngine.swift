@@ -60,7 +60,7 @@ struct RepoStatusSnapshot: Equatable {
         }
 
         if aheadCount > 0 {
-            return "\(currentBranch) is ahead by \(aheadCount) commit\(aheadCount == 1 ? "" : "s")"
+            return "\(aheadCount) local commit\(aheadCount == 1 ? "" : "s") ready to publish"
         }
 
         if behindCount > 0 {
@@ -248,8 +248,8 @@ enum RepoStatusEngine {
             insights.append(
                 RepoInsight(
                     severity: .info,
-                    title: "Ready to push",
-                    detail: "\(currentBranch) is \(aheadCount) commit\(aheadCount == 1 ? "" : "s") ahead" + branchSuffix(upstreamBranch) + "."
+                    title: "Ready to publish",
+                    detail: "Nothing is wrong. You have \(aheadCount) local commit\(aheadCount == 1 ? "" : "s") waiting to be sent to GitHub" + branchSuffix(upstreamBranch) + "."
                 )
             )
         }
@@ -268,7 +268,7 @@ enum RepoStatusEngine {
                     RepoInsight(
                         severity: .info,
                         title: "Branch is local only",
-                        detail: "Push \(currentBranch) to publish it and set an upstream."
+                        detail: "This branch only exists on your Mac right now. Push it once to publish it and connect it to GitHub."
                     )
                 )
             }

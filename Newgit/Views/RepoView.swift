@@ -786,6 +786,36 @@ struct RepoView: View {
             }
         }
     }
+
+    private func showChoiceAlert(
+        title: String,
+        message: String,
+        primaryButtonTitle: String,
+        secondaryButtonTitle: String = "Not Now",
+        primaryAction: @escaping () -> Void
+    ) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: primaryButtonTitle)
+            alert.addButton(withTitle: secondaryButtonTitle)
+
+            let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
+                if response == .alertFirstButtonReturn {
+                    primaryAction()
+                }
+            }
+
+            if let window = NSApplication.shared.keyWindow {
+                alert.beginSheetModal(for: window, completionHandler: handleResponse)
+            } else {
+                let response = alert.runModal()
+                handleResponse(response)
+            }
+        }
+    }
     
     private func loadChangedFiles() {
         // Use `git status --porcelain` to capture staged, unstaged and untracked files.
@@ -968,6 +998,52 @@ struct RepoView: View {
         }
     }
 
+    private func pushCurrentBranch() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let branch = currentBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !branch.isEmpty else {
+                showAlert(title: "Push failed", message: "Newgit couldn't tell which branch is currently checked out.")
+                return
+            }
+
+            let escapedDirectory = shellEscape(projectDirectory)
+            let upstreamCheckCmd = "cd \(escapedDirectory) && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null"
+            let upstreamCheckRes = runCommand(upstreamCheckCmd)
+
+            let pushCmd: String
+            if upstreamCheckRes.status == 0 {
+                pushCmd = "cd \(escapedDirectory) && git push"
+            } else {
+                pushCmd = "cd \(escapedDirectory) && git push --set-upstream origin \(shellEscape(branch))"
+            }
+
+            print("RepoView.pushCurrentBranch: running: \(pushCmd)")
+            let pushRes = runCommand(pushCmd)
+            print("RepoView.pushCurrentBranch: exit=\(pushRes.status) output=\(pushRes.output)")
+
+            refreshRepositoryState()
+
+            DispatchQueue.main.async {
+                let output = pushRes.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if pushRes.status == 0 {
+                    showAlert(
+                        title: "Published to GitHub",
+                        message: output.isEmpty
+                            ? "\(branch) was pushed successfully."
+                            : "\(branch) was pushed successfully.\n\n\(output)"
+                    )
+                } else {
+                    showAlert(
+                        title: "Push failed",
+                        message: output.isEmpty
+                            ? "Newgit couldn't push \(branch) right now."
+                            : output
+                    )
+                }
+            }
+        }
+    }
+
     private func loadRepoStatus() {
         DispatchQueue.main.async {
             self.isLoadingRepoStatus = true
@@ -1109,7 +1185,23 @@ struct RepoView: View {
                 if res.status == 0 {
                     loadBranches()
                     loadChangedFiles()
-                    showAlert(title: "Merge succeeded", message: res.output.trimmingCharacters(in: .whitespacesAndNewlines))
+                    let snapshot = RepoStatusEngine.load(projectDirectory: projectDirectory)
+                    if snapshot.aheadCount > 0 && snapshot.behindCount == 0 && !snapshot.hasConflicts {
+                        let commitLabel = snapshot.aheadCount == 1 ? "commit" : "commits"
+                        showChoiceAlert(
+                            title: "Merge completed",
+                            message: "\(snapshot.currentBranch) now has \(snapshot.aheadCount) local \(commitLabel) ready to publish. Nothing is broken. Push now to send this merge to GitHub?",
+                            primaryButtonTitle: "Push Now"
+                        ) {
+                            pushCurrentBranch()
+                        }
+                    } else {
+                        let msg = res.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                        showAlert(
+                            title: "Merge completed",
+                            message: msg.isEmpty ? "The merge finished successfully." : msg
+                        )
+                    }
                 } else {
                     showAlert(title: "Merge failed", message: res.output)
                 }
@@ -1367,6 +1459,12 @@ struct RepoView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
+                        } else if shouldShowPushButton(for: insight, status: repoStatus) {
+                            Button("Push Now") {
+                                pushCurrentBranch()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
                         }
                     }
                 }
@@ -1430,6 +1528,22 @@ struct RepoView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
+
+                            Spacer(minLength: 12)
+
+                            if shouldShowPullButton(for: insight, status: repoStatus) {
+                                Button("Pull") {
+                                    performPull()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                            } else if shouldShowPushButton(for: insight, status: repoStatus) {
+                                Button("Push Now") {
+                                    pushCurrentBranch()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                            }
                         }
                     }
                 }
@@ -1487,11 +1601,12 @@ struct RepoView: View {
     private func highPriorityInsights(for status: RepoStatusSnapshot) -> [RepoInsight] {
         let criticalInsights = status.insights.filter { $0.severity == .critical }
         let remoteChangeInsights = status.insights.filter { $0.title == "Remote has new commits" }
+        let publishInsights = status.insights.filter { shouldShowPushButton(for: $0, status: status) }
         if status.branchLooksDeletedAfterPR {
             let branchInsights = status.insights.filter { $0.title == "Branch may have been deleted by a PR" }
-            return deduplicatedInsights(criticalInsights + branchInsights + remoteChangeInsights)
+            return deduplicatedInsights(criticalInsights + branchInsights + remoteChangeInsights + publishInsights)
         }
-        return deduplicatedInsights(criticalInsights + remoteChangeInsights)
+        return deduplicatedInsights(criticalInsights + remoteChangeInsights + publishInsights)
     }
 
     private func shouldShowInlineInsights(for status: RepoStatusSnapshot) -> Bool {
@@ -1500,6 +1615,22 @@ struct RepoView: View {
 
     private func shouldShowPullButton(for insight: RepoInsight, status: RepoStatusSnapshot) -> Bool {
         insight.title == "Remote has new commits" && status.behindCount > 0
+    }
+
+    private func shouldShowPushButton(for insight: RepoInsight, status: RepoStatusSnapshot) -> Bool {
+        if status.hasConflicts || status.behindCount > 0 || status.isDetachedHead {
+            return false
+        }
+
+        if insight.title == "Ready to publish" && status.aheadCount > 0 {
+            return true
+        }
+
+        if insight.title == "Branch is local only" || insight.title == "Branch is not tracking remote" {
+            return true
+        }
+
+        return false
     }
 
     private func deduplicatedInsights(_ insights: [RepoInsight]) -> [RepoInsight] {
