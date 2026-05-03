@@ -60,6 +60,8 @@ struct RepoView: View {
     @State private var showReleaseLink: Bool = false
     // Navigation state for the Ignored Files screen
     @State private var showIgnoredFilesLink: Bool = false
+    // Navigation state for the Blame Timeline screen
+    @State private var showBlameTimelineLink: Bool = false
     
     var body: some View {
         let navigation = NavigationStack {
@@ -78,6 +80,9 @@ struct RepoView: View {
                 }
                 .navigationDestination(isPresented: $showIgnoredFilesLink) {
                     IgnoredFilesView(projectDirectory: projectDirectory)
+                }
+                .navigationDestination(isPresented: $showBlameTimelineLink) {
+                    BlameTimelineView(projectDirectory: projectDirectory)
                 }
         }
 
@@ -403,6 +408,9 @@ struct RepoView: View {
             }
             Button("Show Ignored Files") {
                 showIgnoredFilesLink = true
+            }
+            Button("Show Blame Timeline") {
+                showBlameTimelineLink = true
             }
             Button("Show Issues") {
                 showIssuesLink = true
