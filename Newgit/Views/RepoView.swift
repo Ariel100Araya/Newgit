@@ -288,10 +288,14 @@ struct RepoView: View {
                                             .font(.system(.body, design: .monospaced))
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     } else {
-                                        Text(selectedFileDiff)
-                                            .padding(.horizontal)
-                                            .font(.system(.body, design: .monospaced))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        LazyVStack(alignment: .leading, spacing: 2) {
+                                            ForEach(DiffEditEngine.visibleLines(from: selectedFileDiff)) { line in
+                                                diffLineView(line)
+                                            }
+                                        }
+                                        .padding(.horizontal)
+                                        .padding(.vertical, 6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                 }
                             } else {
@@ -376,18 +380,12 @@ struct RepoView: View {
             }
         }
     }
-
+    // MARK: Actions Menu
     private var actionsMenu: some View {
         Menu("Actions") {
             Button("Pull") { performPull() }
             Button("Push") { showPush = true }
                 .disabled(!canPush)
-            Button("Insights") {
-                showInsightsLink = true
-            }
-            Button("Ignored Files") {
-                showIgnoredFilesLink = true
-            }
             Button("Stash Changes...") {
                 stashMessage = ""
                 stashIncludeUntracked = true
@@ -400,7 +398,13 @@ struct RepoView: View {
             }
             .help("Create a new commit that reverts the latest commit (HEAD). Requires a clean working tree.")
             Divider()
-            Button("Show issues") {
+            Button("Show Insights") {
+                showInsightsLink = true
+            }
+            Button("Show Ignored Files") {
+                showIgnoredFilesLink = true
+            }
+            Button("Show Issues") {
                 showIssuesLink = true
             }
             Button("Show Pull Requests") {
@@ -1028,7 +1032,7 @@ struct RepoView: View {
                     print("RepoView.loadDiff: running cat for untracked file: \(catCmd)")
                     let resCat = runCommand(catCmd)
                     if !resCat.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        finalOutput = "(New file) Contents:\n\n" + resCat.output
+                        finalOutput = DiffEditEngine.unifiedDiffForNewFile(path: file, contents: resCat.output)
                     } else {
                         finalOutput = "(New file) No readable contents or file is binary."
                     }
@@ -1648,6 +1652,54 @@ struct RepoView: View {
             return .orange
         case .critical:
             return .red
+        }
+    }
+
+    private func diffLineView(_ line: DiffEditLine) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(line.marker)
+                .font(.system(.body, design: .monospaced))
+                .fontWeight(.semibold)
+                .foregroundStyle(diffLineForeground(for: line.kind))
+                .frame(width: 18, alignment: .center)
+
+            Text(line.text.isEmpty ? " " : line.text)
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(diffLineForeground(for: line.kind))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(diffLineBackground(for: line.kind))
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+    }
+
+    private func diffLineBackground(for kind: DiffEditLine.Kind) -> Color {
+        switch kind {
+        case .addition:
+            return Color.green.opacity(0.18)
+        case .deletion:
+            return Color.red.opacity(0.18)
+        case .hunkHeader:
+            return Color.accentColor.opacity(0.12)
+        default:
+            return Color.clear
+        }
+    }
+
+    private func diffLineForeground(for kind: DiffEditLine.Kind) -> Color {
+        switch kind {
+        case .addition:
+            return .green
+        case .deletion:
+            return .red
+        case .metadata:
+            return .secondary
+        case .hunkHeader:
+            return .accentColor
+        default:
+            return .primary
         }
     }
 
