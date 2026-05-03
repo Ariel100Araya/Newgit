@@ -58,6 +58,8 @@ struct RepoView: View {
     @State private var showPullRequestsLink: Bool = false
     // Navigation state for the Add Release screen
     @State private var showReleaseLink: Bool = false
+    // Navigation state for the Ignored Files screen
+    @State private var showIgnoredFilesLink: Bool = false
     
     var body: some View {
         let navigation = NavigationStack {
@@ -73,6 +75,9 @@ struct RepoView: View {
                 }
                 .navigationDestination(isPresented: $showReleaseLink) {
                     ReleaseView(projectDirectory: projectDirectory)
+                }
+                .navigationDestination(isPresented: $showIgnoredFilesLink) {
+                    IgnoredFilesView(projectDirectory: projectDirectory)
                 }
         }
 
@@ -180,6 +185,10 @@ struct RepoView: View {
             guard let path = notification.object as? String, path == projectDirectory else { return }
             showReleaseLink = true
         })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenIgnoredFilesInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            showIgnoredFilesLink = true
+        })
         anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitRefreshSelectedRepo)) { notification in
             guard let path = notification.object as? String, path == projectDirectory else { return }
             refreshRepositoryState()
@@ -245,6 +254,11 @@ struct RepoView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button("Add to .gitignore") {
+                                        addPathToGitignore(file)
+                                    }
+                                }
                             }
                             .listStyle(.plain)
                             .frame(minWidth: 240)
@@ -370,6 +384,9 @@ struct RepoView: View {
                 .disabled(!canPush)
             Button("Insights") {
                 showInsightsLink = true
+            }
+            Button("Ignored Files") {
+                showIgnoredFilesLink = true
             }
             Button("Stash Changes...") {
                 stashMessage = ""
@@ -866,6 +883,8 @@ struct RepoView: View {
                 parsedFiles.append(pathPortion)
             }
         }
+
+        parsedFiles = parsedFiles.filter { !pathMatchesGitIgnore($0) }
         
         // Cache raw output and update state on main thread
         DispatchQueue.main.async {
@@ -879,6 +898,54 @@ struct RepoView: View {
             }
             // Ensure the Push button updates quickly when we discover local changes
             self.canPush = !self.changedFiles.isEmpty
+        }
+    }
+
+    private func pathMatchesGitIgnore(_ path: String) -> Bool {
+        let cmd = "cd \(shellEscape(projectDirectory)) && git check-ignore --quiet --no-index -- \(shellEscape(path))"
+        return runCommand(cmd).status == 0
+    }
+
+    private func addPathToGitignore(_ path: String) {
+        let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty else { return }
+
+        let gitignoreURL = URL(fileURLWithPath: projectDirectory).appendingPathComponent(".gitignore")
+
+        do {
+            let existingContents: String
+            if FileManager.default.fileExists(atPath: gitignoreURL.path) {
+                existingContents = try String(contentsOf: gitignoreURL, encoding: .utf8)
+            } else {
+                existingContents = ""
+            }
+
+            let existingEntries = Set(
+                existingContents
+                    .components(separatedBy: .newlines)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            )
+
+            if existingEntries.contains(trimmedPath) {
+                showAlert(title: "Already ignored", message: "\(trimmedPath) is already in .gitignore.")
+                return
+            }
+
+            var updatedContents = existingContents
+            if !updatedContents.isEmpty, !updatedContents.hasSuffix("\n") {
+                updatedContents += "\n"
+            }
+            updatedContents += trimmedPath + "\n"
+
+            try updatedContents.write(to: gitignoreURL, atomically: true, encoding: .utf8)
+
+            DispatchQueue.global(qos: .userInitiated).async {
+                loadChangedFiles()
+            }
+            showAlert(title: "Added to .gitignore", message: "\(trimmedPath) was added to .gitignore.")
+        } catch {
+            showAlert(title: "Could not update .gitignore", message: error.localizedDescription)
         }
     }
     

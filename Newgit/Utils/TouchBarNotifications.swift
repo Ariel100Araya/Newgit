@@ -15,6 +15,7 @@ extension Notification.Name {
     static let newgitOpenRelease = Notification.Name("Newgit.OpenRelease")
     static let newgitOpenIssuesInSelectedRepo = Notification.Name("Newgit.OpenIssuesInSelectedRepo")
     static let newgitOpenReleaseInSelectedRepo = Notification.Name("Newgit.OpenReleaseInSelectedRepo")
+    static let newgitOpenIgnoredFilesInSelectedRepo = Notification.Name("Newgit.OpenIgnoredFilesInSelectedRepo")
     static let newgitShowPullRequestsInSelectedRepo = Notification.Name("Newgit.ShowPullRequestsInSelectedRepo")
     static let newgitShowPushInSelectedRepo = Notification.Name("Newgit.ShowPushInSelectedRepo")
     static let newgitPullInSelectedRepo = Notification.Name("Newgit.PullInSelectedRepo")

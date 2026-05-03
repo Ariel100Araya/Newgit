@@ -185,6 +185,103 @@ struct PushView: View {
          return (needsPull, combined, 0)
      }
 
+     private struct CommitCandidate {
+         let status: String
+         let path: String
+
+         var isDeletion: Bool {
+             status.contains("D")
+         }
+     }
+
+     private func parsePorcelainStatus(_ output: String) -> [CommitCandidate] {
+         let records = output.split(separator: "\0", omittingEmptySubsequences: true).map(String.init)
+         var candidates: [CommitCandidate] = []
+         var index = 0
+
+         while index < records.count {
+             let record = records[index]
+             guard record.count >= 4 else {
+                 index += 1
+                 continue
+             }
+
+             let status = String(record.prefix(2))
+             let pathStart = record.index(record.startIndex, offsetBy: 3)
+             let firstPath = String(record[pathStart...])
+
+             if status.contains("R") || status.contains("C") {
+                 if index + 1 < records.count {
+                     candidates.append(CommitCandidate(status: status, path: records[index + 1]))
+                     index += 2
+                 } else {
+                     candidates.append(CommitCandidate(status: status, path: firstPath))
+                     index += 1
+                 }
+             } else {
+                 candidates.append(CommitCandidate(status: status, path: firstPath))
+                 index += 1
+             }
+         }
+
+         var seen = Set<String>()
+         return candidates.filter { candidate in
+             guard !candidate.path.isEmpty, !seen.contains(candidate.path) else { return false }
+             seen.insert(candidate.path)
+             return true
+         }
+     }
+
+     private func pathMatchesGitIgnore(_ path: String, in escapedDirectory: String) -> Bool {
+         let ignoredCmd = "cd \(escapedDirectory) && git check-ignore --quiet --no-index -- \(shellEscape(path))"
+         return runCommand(ignoredCmd).status == 0
+     }
+
+     private func stageCommitCandidates(in escapedDirectory: String) -> (output: String, status: Int32) {
+         var combined = ""
+         let statusCmd = "cd \(escapedDirectory) && git status --porcelain -z"
+         let statusRes = runCommand(statusCmd)
+         combined += "$ \(statusCmd)\n" + statusRes.output.replacingOccurrences(of: "\0", with: "\n") + "\nexit=\(statusRes.status)\n\n"
+         guard statusRes.status == 0 else {
+             return (combined, statusRes.status)
+         }
+
+         let candidates = parsePorcelainStatus(statusRes.output)
+         var stagedCount = 0
+         var skippedIgnoredPaths: [String] = []
+
+         for candidate in candidates {
+             if pathMatchesGitIgnore(candidate.path, in: escapedDirectory) {
+                 skippedIgnoredPaths.append(candidate.path)
+                 let resetCmd = "cd \(escapedDirectory) && git reset -q -- \(shellEscape(candidate.path))"
+                 let resetRes = runCommand(resetCmd)
+                 combined += "$ \(resetCmd)\n" + resetRes.output + "\nexit=\(resetRes.status)\n\n"
+                 continue
+             }
+
+             let addFlag = candidate.isDeletion ? "--all" : "--"
+             let addCmd = "cd \(escapedDirectory) && git add \(addFlag) \(shellEscape(candidate.path))"
+             let addRes = runCommand(addCmd)
+             combined += "$ \(addCmd)\n" + addRes.output + "\nexit=\(addRes.status)\n\n"
+             if addRes.status != 0 {
+                 return (combined, addRes.status)
+             }
+             stagedCount += 1
+         }
+
+         if !skippedIgnoredPaths.isEmpty {
+             combined += "Skipped ignored path\(skippedIgnoredPaths.count == 1 ? "" : "s"):\n"
+             combined += skippedIgnoredPaths.map { "- \($0)" }.joined(separator: "\n")
+             combined += "\n\n"
+         }
+
+         if stagedCount == 0 {
+             combined += "No non-ignored working tree changes were staged.\n\n"
+         }
+
+         return (combined, 0)
+     }
+
      private func performPush() {
          guard !isProcessing else { return }
          isProcessing = true
@@ -197,10 +294,10 @@ struct PushView: View {
 
              var combined = ""
 
-             // git add
-             let addCmd = "cd \(dir) && git add ."
-             let addRes = runCommand(addCmd)
-             combined += "$ \(addCmd)\n" + addRes.output + "\nexit=\(addRes.status)\n\n"
+             // Stage only paths that do not match .gitignore rules. This also keeps
+             // already-tracked ignored paths out of the next commit.
+             let addRes = stageCommitCandidates(in: dir)
+             combined += addRes.output
              if addRes.status != 0 {
                  // Provide a short error summary and offer details
                  let short = addRes.output.split(separator: "\n").first.map(String.init) ?? "git add failed"

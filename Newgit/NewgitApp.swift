@@ -294,6 +294,13 @@ private struct NewgitMenuCommands: Commands {
                 }
                 .disabled(!hasSelection)
                 .keyboardShortcut("2", modifiers: [.command])
+
+                Button("Show Ignored Files") {
+                    guard let selectedPath else { return }
+                    NotificationCenter.default.post(name: .newgitOpenIgnoredFilesInSelectedRepo, object: selectedPath)
+                }
+                .disabled(!hasSelection)
+                .keyboardShortcut("3", modifiers: [.command])
             }
         }
 

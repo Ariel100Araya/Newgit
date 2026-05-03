@@ -339,6 +339,10 @@ struct ContentView: View {
                 guard let selectedRepositoryPath else { return }
                 NotificationCenter.default.post(name: .newgitOpenRelease, object: selectedRepositoryPath)
             }
+            touchBarButton("Ignored", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitOpenIgnoredFilesInSelectedRepo, object: selectedRepositoryPath)
+            }
             touchBarButton("Refresh", disabled: !hasSelectedRepository) {
                 guard let selectedRepositoryPath else { return }
                 NotificationCenter.default.post(name: .newgitRefreshSelectedRepo, object: selectedRepositoryPath)
