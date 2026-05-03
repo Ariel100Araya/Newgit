@@ -301,6 +301,13 @@ private struct NewgitMenuCommands: Commands {
                 }
                 .disabled(!hasSelection)
                 .keyboardShortcut("3", modifiers: [.command])
+
+                Button("Edit README") {
+                    guard let selectedPath else { return }
+                    NotificationCenter.default.post(name: .newgitOpenReadmeEditorInSelectedRepo, object: selectedPath)
+                }
+                .disabled(!hasSelection)
+                .keyboardShortcut("4", modifiers: [.command])
             }
         }
 

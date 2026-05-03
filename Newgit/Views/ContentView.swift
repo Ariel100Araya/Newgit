@@ -343,6 +343,10 @@ struct ContentView: View {
                 guard let selectedRepositoryPath else { return }
                 NotificationCenter.default.post(name: .newgitOpenIgnoredFilesInSelectedRepo, object: selectedRepositoryPath)
             }
+            touchBarButton("README", disabled: !hasSelectedRepository) {
+                guard let selectedRepositoryPath else { return }
+                NotificationCenter.default.post(name: .newgitOpenReadmeEditorInSelectedRepo, object: selectedRepositoryPath)
+            }
             touchBarButton("Refresh", disabled: !hasSelectedRepository) {
                 guard let selectedRepositoryPath else { return }
                 NotificationCenter.default.post(name: .newgitRefreshSelectedRepo, object: selectedRepositoryPath)

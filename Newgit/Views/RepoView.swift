@@ -62,6 +62,7 @@ struct RepoView: View {
     @State private var showIgnoredFilesLink: Bool = false
     // Navigation state for the Blame Timeline screen
     @State private var showBlameTimelineLink: Bool = false
+    @State private var showReadmeEditor: Bool = false
     
     var body: some View {
         let navigation = NavigationStack {
@@ -105,6 +106,11 @@ struct RepoView: View {
         anyView = AnyView(anyView.sheet(isPresented: $showMergeSheet) { mergeBranchSheet })
         anyView = AnyView(anyView.sheet(isPresented: $showPRSheet) { pullRequestSheet })
         anyView = AnyView(anyView.sheet(isPresented: $showStashSheet) { stashSheet })
+        anyView = AnyView(anyView.sheet(isPresented: $showReadmeEditor) {
+            ReadmeEditorView(projectDirectory: projectDirectory, repoTitle: repoTitle) {
+                refreshRepositoryState()
+            }
+        })
 
         anyView = AnyView(anyView.onAppear {
             DispatchQueue.global(qos: .userInitiated).async {
@@ -193,6 +199,10 @@ struct RepoView: View {
         anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenIgnoredFilesInSelectedRepo)) { notification in
             guard let path = notification.object as? String, path == projectDirectory else { return }
             showIgnoredFilesLink = true
+        })
+        anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitOpenReadmeEditorInSelectedRepo)) { notification in
+            guard let path = notification.object as? String, path == projectDirectory else { return }
+            showReadmeEditor = true
         })
         anyView = AnyView(anyView.onReceive(NotificationCenter.default.publisher(for: .newgitRefreshSelectedRepo)) { notification in
             guard let path = notification.object as? String, path == projectDirectory else { return }
@@ -408,6 +418,9 @@ struct RepoView: View {
             }
             Button("Show Ignored Files") {
                 showIgnoredFilesLink = true
+            }
+            Button("Edit README") {
+                showReadmeEditor = true
             }
             Button("Show Blame Timeline") {
                 showBlameTimelineLink = true

@@ -15,6 +15,17 @@ Basically GitHub Desktop is based on Electron and although it works with multipl
 
 It works by doing gh and git commands in your terminal. Using Swift's Process() method, it makes for a nice looking repository manager, and using SwiftUI's NavigationSplitView it looks great too!
 
+## Updates!
+
+Newgit has gotten even more features, here's just some of them 
+
+- You can now see, respond, and close **Pull Requests and Issues**
+- You can easily make **GitHub Releases** right in the app and drag and drop the binary over as well!
+- See a timeline view of **blame** that makes it easy to see who commited what and what got edited
+- Edit **README.md** files quickly right in Newgit with a built in editor for it.
+- Place files in **.gitignore** in a single click
+- Use **Siri Shortcuts** to make automations or control your repositories by just typing in Spotlight
+
 ## Get set up
 
 ![Welcome!](screenshots/s4.png)
