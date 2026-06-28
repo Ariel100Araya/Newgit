@@ -9,6 +9,16 @@ import SwiftData
 
 struct ContentView: View {
     @Query private var savedRepos: [SavedRepo]
+    private var sortedRepos: [SavedRepo] {
+        savedRepos.sorted { r1, r2 in
+            let e1 = FileManager.default.fileExists(atPath: r1.path)
+            let e2 = FileManager.default.fileExists(atPath: r2.path)
+            if e1 == e2 {
+                return r1.name.localizedCompare(r2.name) == .orderedAscending
+            }
+            return e1 && !e2
+        }
+    }
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var commandCenter: AppCommandCenter
     @State var showAddRepo = false
@@ -198,12 +208,20 @@ struct ContentView: View {
                 Spacer()
             }
             List(selection: $selectionID) {
-                ForEach(savedRepos, id: \.id) { repo in
-                    Text(repo.name)
-                        .tag(repo.id)
-                        .font(.title2)
-                        .accessibilityIdentifier("sidebar-repo-\(repo.name)")
-                        .contextMenu { Button("Delete Repository") { repoToDelete = repo; showDeleteDialog = true } }
+                ForEach(sortedRepos, id: \.id) { repo in
+                    HStack {
+                        Text(repo.name)
+                            .font(.title2)
+                        Spacer()
+                        if !FileManager.default.fileExists(atPath: repo.path) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                                .help("Repository folder not found on disk. Click to resolve.")
+                        }
+                    }
+                    .tag(repo.id)
+                    .accessibilityIdentifier("sidebar-repo-\(repo.name)")
+                    .contextMenu { Button("Delete Repository") { repoToDelete = repo; showDeleteDialog = true } }
                 }
             }
             .listStyle(.sidebar)
@@ -219,8 +237,23 @@ struct ContentView: View {
     @ViewBuilder
     private var detailView: some View {
         if let id = selectionID, let repo = savedRepos.first(where: { $0.id == id }) {
-            RepoView(repoTitle: repo.name, projectDirectory: repo.path)
+            if !FileManager.default.fileExists(atPath: repo.path) {
+                MissingRepoView(repo: repo, onRelocated: { newPath in
+                    repo.path = newPath
+                    repo.lastUpdated = Date()
+                    try? modelContext.save()
+                    SavedRepoBackupStore.shared.sync(repos: savedRepos)
+                }, onCloneAgain: {
+                    showCloneRepo = true
+                }, onDelete: {
+                    repoToDelete = repo
+                    showDeleteDialog = true
+                })
                 .id(repo.id)
+            } else {
+                RepoView(repoTitle: repo.name, projectDirectory: repo.path)
+                    .id(repo.id)
+            }
         } else {
             VStack(alignment: .leading) {
                 Text("Select a repository")

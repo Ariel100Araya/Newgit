@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import ConfettiSwiftUI
 #if os(macOS)
 import AppKit
